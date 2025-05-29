@@ -1,0 +1,4 @@
+Product_ID,Product_Name,Description,Category,Brand,Price,Stock_Quantity,Weight,Dimensions,Image_URL,Status
+TEST-001,"Test Smart Watch","Advanced fitness tracking smartwatch","Electronics","TechPro",199.99,30,0.1,"4x4x1cm","https://example.com/watch.jpg",Active
+TEST-002,"Wireless Earbuds","High-quality bluetooth earbuds","Electronics","AudioMax",79.99,50,0.05,"5x3x2cm","https://example.com/earbuds.jpg",Active
+TEST-003,"Yoga Mat Premium","Non-slip premium yoga mat","Sports","FitLife",45.99,75,1.2,"183x61x0.6cm","https://example.com/yoga-mat.jpg",Active

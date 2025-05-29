@@ -1,0 +1,6 @@
+Product_ID,Product_Name,Product_Description,Product_Category,Brand_Name,Price,Stock_Qty,Product_Weight,Product_Dimensions,Image_Link,Is_Active
+CSV-001,"Smart Phone Case","Protective case for smartphones","Electronics","TechGuard",24.99,150,0.1,"15x8x1cm","https://example.com/phone-case.jpg",Yes
+CSV-002,"Wireless Charger","Fast wireless charging pad","Electronics","PowerTech",34.99,75,0.3,"10x10x2cm","https://example.com/wireless-charger.jpg",Yes
+CSV-003,"Bluetooth Speaker","Portable bluetooth speaker with bass","Electronics","SoundMax",89.99,25,0.8,"20x8x8cm","https://example.com/speaker.jpg",No
+CSV-004,"Running Shoes","Comfortable running shoes for athletes","Sports","RunPro",129.99,50,0.6,"30x20x12cm","https://example.com/shoes.jpg",Yes
+CSV-005,"Coffee Mug","Ceramic coffee mug with handle","Home & Garden","KitchenPlus",14.99,200,0.4,"12x9x10cm","https://example.com/mug.jpg",Yes
