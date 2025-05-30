@@ -8,8 +8,8 @@ export const useProducts = () => useContext(ProductContext);
 // Default pricing settings
 const defaultPricingSettings = {
   global: {
-    currencyConversion: 1.82, // USD to LKR / 100
-    shippingCost: 5.00,
+    currencyConversion: null, // Will be loaded from API
+    shippingCost: 500,
     defaultMargin: 20
   },
   categories: {} // Will be populated from API
@@ -21,17 +21,18 @@ export const ProductProvider = ({ children }) => {
   const [pricingSettings, setPricingSettings] = useState(defaultPricingSettings);
   const [categories, setCategories] = useState([]);
 
-  // Load categories and update pricing settings
+  // Load categories and pricing settings
   useEffect(() => {
-    const loadCategories = async () => {
+    const loadInitialData = async () => {
       try {
-        const response = await apiService.getActiveCategories();
-        if (response.success) {
-          setCategories(response.categories);
+        // Load categories
+        const categoriesResponse = await apiService.getActiveCategories();
+        if (categoriesResponse.success) {
+          setCategories(categoriesResponse.categories);
           
           // Update pricing settings with category margins
           const categoryMargins = {};
-          response.categories.forEach(category => {
+          categoriesResponse.categories.forEach(category => {
             categoryMargins[category.name] = { margin: category.defaultMargin };
           });
           
@@ -40,12 +41,45 @@ export const ProductProvider = ({ children }) => {
             categories: categoryMargins
           }));
         }
+        
+        // Load global pricing settings including conversion rate
+        try {
+          const [pricingResponse, conversionResponse] = await Promise.all([
+            apiService.get('/admin/pricing/global').catch(() => ({ success: false })),
+            apiService.getConversionRate().catch(() => ({ success: false }))
+          ]);
+          
+          const currencyConversion = conversionResponse.success && conversionResponse.conversionRate 
+            ? conversionResponse.conversionRate 
+            : (pricingResponse.success && pricingResponse.settings?.currencyConversion) || 400; // Fallback to 400
+          
+          console.log('💱 ProductContext: Loaded conversion rate:', currencyConversion);
+          
+          setPricingSettings(prev => ({
+            ...prev,
+            global: {
+              currencyConversion,
+              shippingCost: (pricingResponse.success && pricingResponse.settings?.shippingCost) || 500,
+              defaultMargin: (pricingResponse.success && pricingResponse.settings?.defaultMargin) || 20
+            }
+          }));
+        } catch (error) {
+          console.log('❌ ProductContext: Error loading pricing settings, using defaults');
+          setPricingSettings(prev => ({
+            ...prev,
+            global: {
+              currencyConversion: 400, // Use database default
+              shippingCost: 500,
+              defaultMargin: 20
+            }
+          }));
+        }
       } catch (error) {
-        console.error('Failed to load categories:', error);
+        console.error('Failed to load initial data:', error);
       }
     };
 
-    loadCategories();
+    loadInitialData();
   }, []);
 
   // Calculate seller price based on admin price, category, and custom margin
@@ -66,15 +100,38 @@ export const ProductProvider = ({ children }) => {
       const response = await apiService.getProductCatalog();
       
       if (response.success) {
-        const productsWithPricing = response.products.map(product => ({
-          ...product,
-          sellerPrice: product.customPrice || calculateSellerPrice(
-            product.adminPrice, 
-            product.category, 
-            product.customMargin
-          )
-        }));
-        
+        console.log('🛒 Product catalog response:', response.products.slice(0, 2));
+        const productsWithPricing = response.products.map(product => {
+          let sellerPrice;
+          
+          if (product.customPrice !== null && product.customPrice !== undefined) {
+            // Use custom price if available (from bulk edit with shipping)
+            sellerPrice = product.customPrice;
+          } else {
+            // Calculate price using custom margin or default margin
+            const calculatedPrice = calculateSellerPrice(
+              product.adminPrice, 
+              product.category, 
+              product.customMargin
+            );
+            sellerPrice = calculatedPrice;
+          }
+          
+          // Temporarily get custom shipping fee from localStorage until backend supports it
+          let customShippingFee = product.customShippingFee;
+          if (!customShippingFee && product.customPrice) {
+            const shippingFeeData = JSON.parse(localStorage.getItem('customShippingFees') || '{}');
+            customShippingFee = shippingFeeData[product.id] || null;
+          }
+          
+          console.log(`📦 Product ${product.id}: adminPrice=${product.adminPrice}, customPrice=${product.customPrice}, customMargin=${product.customMargin}, customShippingFee=${customShippingFee}, sellerPrice=${sellerPrice}`);
+          
+          return {
+            ...product,
+            sellerPrice,
+            customShippingFee
+          };
+        });
         setLoading(false);
         return productsWithPricing;
       } else {

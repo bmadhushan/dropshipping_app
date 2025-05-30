@@ -30,6 +30,122 @@ const AdminOrderReviewPage = () => {
       setLoading(true);
       setError(null);
       
+      // Check if we're using mock authentication
+      const token = localStorage.getItem('auth_token');
+      if (token === 'mock-token-for-testing') {
+        // Use mock data when backend is not available
+        setTimeout(() => {
+          const mockOrders = [
+            {
+              id: 1,
+              order_number: 'ORD-1748507773207-AI06IH',
+              seller_business_name: 'Tech Solutions Ltd',
+              seller_email: 'contact@techsolutions.com',
+              created_at: '2025-05-29T08:36:13Z',
+              total_amount: 447.71,
+              status: 'pending',
+              customer_name: 'John Doe',
+              customer_email: 'john@example.com',
+              customer_phone: '+1234567890',
+              shipping_address: '123 Main St, City, State 12345',
+              notes: 'Please handle with care',
+              items: [
+                {
+                  id: 1,
+                  order_id: 1,
+                  product_id: 7,
+                  product_name: 'Bamboo Hoodie',
+                  product_sku: 'EW-007',
+                  quantity: 2,
+                  unit_price: 223.855,
+                  total_price: 447.71
+                }
+              ]
+            },
+            {
+              id: 2,
+              order_number: 'ORD-1748508858824-VG5JBQ',
+              seller_business_name: 'Fashion Forward',
+              seller_email: 'info@fashionforward.com',
+              created_at: '2025-05-29T08:54:18Z',
+              total_amount: 91.00,
+              status: 'approved',
+              customer_name: 'Jane Smith',
+              customer_email: 'jane@example.com',
+              customer_phone: '+1987654321',
+              shipping_address: '456 Oak Ave, Town, State 67890',
+              notes: 'Standard delivery',
+              items: [
+                {
+                  id: 2,
+                  order_id: 2,
+                  product_id: 3,
+                  product_name: 'Ceramic Planter Set',
+                  product_sku: 'HG-003',
+                  quantity: 2,
+                  unit_price: 45.50,
+                  total_price: 91.00
+                }
+              ]
+            },
+            {
+              id: 3,
+              order_number: 'ORD-1748509547560-Q5XXI1',
+              seller_business_name: 'Home & Garden Co',
+              seller_email: 'sales@homegarden.com',
+              created_at: '2025-05-29T09:05:47Z',
+              total_amount: 325.00,
+              status: 'pending',
+              customer_name: 'Mike Johnson',
+              customer_email: 'mike@example.com',
+              customer_phone: '+1122334455',
+              shipping_address: '789 Pine St, Village, State 13579',
+              notes: 'Red colour, size 7 UK',
+              items: [
+                {
+                  id: 3,
+                  order_id: 3,
+                  product_id: 7,
+                  product_name: 'Bamboo Hoodie',
+                  product_sku: 'EW-007',
+                  quantity: 5,
+                  unit_price: 65.00,
+                  total_price: 325.00
+                }
+              ]
+            }
+          ];
+
+          const formattedOrders = mockOrders.map(order => ({
+            id: order.id,
+            orderNumber: order.order_number,
+            seller: {
+              name: order.seller_business_name,
+              email: order.seller_email
+            },
+            date: order.created_at,
+            totalValue: parseFloat(order.total_amount),
+            status: order.status,
+            items: order.items || [],
+            notes: order.notes,
+            rejectionReason: order.rejection_reason,
+            customerName: order.customer_name,
+            customerEmail: order.customer_email,
+            customerPhone: order.customer_phone,
+            shippingAddress: order.shipping_address
+          }));
+
+          setOrders(formattedOrders);
+          setPagination(prev => ({
+            ...prev,
+            totalPages: 1,
+            hasMore: false
+          }));
+          setLoading(false);
+        }, 1000);
+        return;
+      }
+      
       const params = {
         page: pagination.page,
         limit: pagination.limit,
@@ -40,21 +156,29 @@ const AdminOrderReviewPage = () => {
       };
 
       const response = await apiService.get('/orders/admin/all', { params });
+      console.log('Raw API response:', response);
       
-      const formattedOrders = response.orders.map(order => ({
-        id: order.id,
-        orderNumber: order.order_number,
-        seller: {
-          name: order.seller_business_name || order.seller_name || 'Unknown Seller',
-          email: order.seller_email || 'unknown@email.com'
-        },
-        date: order.created_at,
-        totalValue: parseFloat(order.total_amount),
-        status: order.status,
-        items: order.items || [],
-        notes: order.notes,
-        rejectionReason: order.rejection_reason
-      }));
+      const formattedOrders = response.orders.map(order => {
+        console.log('Processing order:', order.id, 'Items:', order.items);
+        return {
+          id: order.id,
+          orderNumber: order.order_number,
+          seller: {
+            name: order.seller_business_name || order.seller_name || 'Unknown Seller',
+            email: order.seller_email || 'unknown@email.com'
+          },
+          date: order.created_at,
+          totalValue: parseFloat(order.total_amount),
+          status: order.status,
+          items: order.items || [],
+          notes: order.notes,
+          rejectionReason: order.rejection_reason,
+          customerName: order.customer_name,
+          customerEmail: order.customer_email,
+          customerPhone: order.customer_phone,
+          shippingAddress: order.shipping_address
+        };
+      });
 
       setOrders(formattedOrders);
       setPagination(prev => ({
@@ -72,6 +196,26 @@ const AdminOrderReviewPage = () => {
 
   const fetchStats = async () => {
     try {
+      // Check if we're using mock authentication
+      const token = localStorage.getItem('auth_token');
+      if (token === 'mock-token-for-testing') {
+        // Use mock stats data
+        setStats({
+          total_orders: 3,
+          pending_orders: 2,
+          approved_orders: 1,
+          rejected_orders: 0,
+          processing_orders: 0,
+          shipped_orders: 0,
+          delivered_orders: 0,
+          cancelled_orders: 0,
+          total_revenue: 863.71,
+          pending_revenue: 772.71,
+          approved_revenue: 91.00
+        });
+        return;
+      }
+
       const response = await apiService.get('/orders/admin/stats');
       setStats(response.stats);
     } catch (err) {
@@ -86,6 +230,14 @@ const AdminOrderReviewPage = () => {
       
       await apiService.patch(`/orders/admin/${orderId}/status`, payload);
       
+      // If approved, automatically send payment link
+      if (newStatus === 'approved') {
+        const order = orders.find(o => o.id === orderId);
+        if (order) {
+          await handleSendPaymentLink(order);
+        }
+      }
+      
       // Refresh orders and stats
       fetchOrders();
       fetchStats();
@@ -93,6 +245,49 @@ const AdminOrderReviewPage = () => {
     } catch (err) {
       console.error('Error updating order status:', err);
       alert(err.response?.data?.message || 'Failed to update order status');
+    }
+  };
+
+  const handleDownloadInvoice = async (order) => {
+    try {
+      const response = await apiService.get(`/orders/admin/${order.id}/invoice`, {
+        responseType: 'blob'
+      });
+      
+      // Create download link
+      const blob = new Blob([response], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `invoice-${order.orderNumber}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Error downloading invoice:', err);
+      alert('Failed to download invoice. Please try again.');
+    }
+  };
+
+  const handleSendPaymentLink = async (order) => {
+    try {
+      setLoading(true);
+      const response = await apiService.post(`/orders/admin/${order.id}/payment-link`, {
+        sellerEmail: order.seller.email,
+        amount: order.totalValue,
+        currency: 'gbp',
+        description: `Payment for Order ${order.orderNumber}`
+      });
+      
+      if (response.success) {
+        alert(`Payment link sent successfully to ${order.seller.email}`);
+      }
+    } catch (err) {
+      console.error('Error sending payment link:', err);
+      alert(err.response?.data?.message || 'Failed to send payment link');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -172,7 +367,10 @@ const AdminOrderReviewPage = () => {
     <button
       onClick={onClick}
       className={isActive ? 'btn btn-primary' : 'btn btn-outline'}
-      style={{ marginRight: 'var(--space-2)' }}
+      style={{ 
+        whiteSpace: 'nowrap',
+        minWidth: 'fit-content'
+      }}
     >
       {children} ({count})
     </button>
@@ -212,7 +410,7 @@ const AdminOrderReviewPage = () => {
           />
           <StatCard
             title="Total Value"
-            value={`$${(stats.total_revenue || 0).toFixed(0)}`}
+            value={`£${(stats.total_revenue || 0).toFixed(0)}`}
             subtitle="All orders"
             icon="💰"
           />
@@ -227,10 +425,10 @@ const AdminOrderReviewPage = () => {
         {/* Search and Filters */}
         <div style={{ 
           display: 'flex', 
-          gap: 'var(--space-4)', 
+          gap: 'var(--space-3)', 
           marginBottom: 'var(--space-6)',
-          flexWrap: 'wrap',
-          alignItems: 'center'
+          alignItems: 'center',
+          overflow: 'auto'
         }}>
           <input
             type="text"
@@ -241,7 +439,11 @@ const AdminOrderReviewPage = () => {
               setPagination(prev => ({ ...prev, page: 1 }));
             }}
             className="form-input"
-            style={{ minWidth: '200px' }}
+            style={{ 
+              minWidth: '180px',
+              maxWidth: '250px',
+              flex: '1'
+            }}
           />
           <input
             type="date"
@@ -251,6 +453,10 @@ const AdminOrderReviewPage = () => {
               setPagination(prev => ({ ...prev, page: 1 }));
             }}
             className="form-input"
+            style={{ 
+              minWidth: '140px',
+              whiteSpace: 'nowrap'
+            }}
             placeholder="From date"
           />
           <input
@@ -261,18 +467,32 @@ const AdminOrderReviewPage = () => {
               setPagination(prev => ({ ...prev, page: 1 }));
             }}
             className="form-input"
+            style={{ 
+              minWidth: '140px',
+              whiteSpace: 'nowrap'
+            }}
             placeholder="To date"
           />
           <button
             onClick={clearFilters}
             className="btn btn-outline"
+            style={{
+              whiteSpace: 'nowrap',
+              minWidth: 'fit-content'
+            }}
           >
             Clear Filters
           </button>
         </div>
 
         {/* Filter Tabs */}
-        <div style={{ marginBottom: 'var(--space-6)' }}>
+        <div style={{ 
+          marginBottom: 'var(--space-6)',
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 'var(--space-2)',
+          alignItems: 'center'
+        }}>
           <TabButton 
             isActive={filter === 'all'} 
             onClick={() => setFilter('all')}
@@ -412,7 +632,7 @@ const AdminOrderReviewPage = () => {
                           </div>
                         </td>
                         <td className="font-semibold">
-                          ${order.totalValue.toFixed(2)}
+                          £{order.totalValue.toFixed(2)}
                         </td>
                         <td>
                           <span className={`badge ${
@@ -424,17 +644,45 @@ const AdminOrderReviewPage = () => {
                           </span>
                         </td>
                         <td>
-                          <div style={{ display: 'flex', gap: 'var(--space-1)' }}>
+                          <div style={{ 
+                            display: 'flex', 
+                            gap: 'var(--space-1)', 
+                            flexWrap: 'wrap',
+                            justifyContent: 'flex-start'
+                          }}>
                             <button
                               onClick={() => setSelectedOrder(order)}
                               className="btn btn-outline"
                               style={{
                                 cursor: 'pointer',
-                                fontSize: '12px',
-                                padding: 'var(--space-1) var(--space-3)'
+                                fontSize: '11px',
+                                padding: '4px 8px',
+                                minWidth: '60px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px'
                               }}
+                              title="View order details"
                             >
-                              View
+                              👁️ View
+                            </button>
+                            <button
+                              onClick={() => handleDownloadInvoice(order)}
+                              className="btn btn-outline"
+                              style={{
+                                cursor: 'pointer',
+                                fontSize: '11px',
+                                padding: '4px 8px',
+                                minWidth: '60px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                backgroundColor: 'var(--primary-light)',
+                                borderColor: 'var(--primary-medium)'
+                              }}
+                              title="Download invoice"
+                            >
+                              📄 Invoice
                             </button>
                             {order.status === 'pending' && (
                               <>
@@ -443,12 +691,19 @@ const AdminOrderReviewPage = () => {
                                   className="btn btn-secondary"
                                   style={{
                                     cursor: 'pointer',
-                                    fontSize: '12px',
-                                    padding: 'var(--space-1) var(--space-3)',
-                                    backgroundColor: 'var(--success)'
+                                    fontSize: '11px',
+                                    padding: '4px 8px',
+                                    minWidth: '70px',
+                                    backgroundColor: 'var(--success)',
+                                    border: 'none',
+                                    color: 'white',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
                                   }}
+                                  title="Approve order and send payment link"
                                 >
-                                  Approve
+                                  ✅ Approve
                                 </button>
                                 <button
                                   onClick={() => {
@@ -458,14 +713,42 @@ const AdminOrderReviewPage = () => {
                                   className="btn btn-secondary"
                                   style={{
                                     cursor: 'pointer',
-                                    fontSize: '12px',
-                                    padding: 'var(--space-1) var(--space-3)',
-                                    backgroundColor: 'var(--error)'
+                                    fontSize: '11px',
+                                    padding: '4px 8px',
+                                    minWidth: '60px',
+                                    backgroundColor: 'var(--error)',
+                                    border: 'none',
+                                    color: 'white',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
                                   }}
+                                  title="Reject order"
                                 >
-                                  Reject
+                                  ❌ Reject
                                 </button>
                               </>
+                            )}
+                            {order.status === 'approved' && (
+                              <button
+                                onClick={() => handleSendPaymentLink(order)}
+                                className="btn btn-secondary"
+                                style={{
+                                  cursor: 'pointer',
+                                  fontSize: '11px',
+                                  padding: '4px 8px',
+                                  minWidth: '80px',
+                                  backgroundColor: 'var(--primary-medium)',
+                                  border: 'none',
+                                  color: 'white',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}
+                                title="Send payment link to seller"
+                              >
+                                💳 Payment
+                              </button>
                             )}
                           </div>
                         </td>
@@ -556,13 +839,14 @@ const AdminOrderReviewPage = () => {
 
               <div style={{ display: 'grid', gap: 'var(--space-6)' }}>
                 {/* Order Info */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--space-4)' }}>
                   <div>
                     <label className="font-semibold" style={{ display: 'block', marginBottom: 'var(--space-1)', color: 'var(--text-primary)' }}>
-                      Seller
+                      Order Number
                     </label>
-                    <p style={{ margin: 0, color: 'var(--text-secondary)' }}>{selectedOrder.seller.name}</p>
-                    <p className="text-sm" style={{ margin: 0, color: 'var(--text-light)' }}>{selectedOrder.seller.email}</p>
+                    <p style={{ margin: 0, color: 'var(--text-secondary)', fontFamily: 'monospace', backgroundColor: 'var(--bg-accent)', padding: '4px 8px', borderRadius: '4px' }}>
+                      {selectedOrder.orderNumber}
+                    </p>
                   </div>
                   <div>
                     <label className="font-semibold" style={{ display: 'block', marginBottom: 'var(--space-1)', color: 'var(--text-primary)' }}>
@@ -570,111 +854,278 @@ const AdminOrderReviewPage = () => {
                     </label>
                     <p style={{ margin: 0, color: 'var(--text-secondary)' }}>{formatDate(selectedOrder.date)}</p>
                   </div>
+                  <div>
+                    <label className="font-semibold" style={{ display: 'block', marginBottom: 'var(--space-1)', color: 'var(--text-primary)' }}>
+                      Status
+                    </label>
+                    <span className={`badge ${
+                      selectedOrder.status === 'pending' ? 'badge-warning' :
+                      selectedOrder.status === 'approved' ? 'badge-success' :
+                      'badge-error'
+                    }`}>
+                      {selectedOrder.status.charAt(0).toUpperCase() + selectedOrder.status.slice(1)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Seller Information */}
+                <div style={{ backgroundColor: 'var(--bg-accent)', padding: 'var(--space-4)', borderRadius: 'var(--radius-md)' }}>
+                  <h4 style={{ margin: '0 0 var(--space-3) 0', color: 'var(--text-primary)' }}>👤 Seller Information</h4>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
+                    <div>
+                      <label className="font-semibold" style={{ display: 'block', marginBottom: 'var(--space-1)', color: 'var(--text-primary)' }}>
+                        Business Name
+                      </label>
+                      <p style={{ margin: 0, color: 'var(--text-secondary)' }}>{selectedOrder.seller.name}</p>
+                    </div>
+                    <div>
+                      <label className="font-semibold" style={{ display: 'block', marginBottom: 'var(--space-1)', color: 'var(--text-primary)' }}>
+                        Email Address
+                      </label>
+                      <p style={{ margin: 0, color: 'var(--text-secondary)' }}>{selectedOrder.seller.email}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Customer & Shipping Information */}
+                <div style={{ backgroundColor: 'var(--bg-light)', padding: 'var(--space-4)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-light)' }}>
+                  <h4 style={{ margin: '0 0 var(--space-3) 0', color: 'var(--text-primary)' }}>🚚 Customer & Shipping Details</h4>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
+                    <div>
+                      <label className="font-semibold" style={{ display: 'block', marginBottom: 'var(--space-1)', color: 'var(--text-primary)' }}>
+                        Customer Name
+                      </label>
+                      <p style={{ margin: 0, color: 'var(--text-secondary)' }}>{selectedOrder.customerName || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <label className="font-semibold" style={{ display: 'block', marginBottom: 'var(--space-1)', color: 'var(--text-primary)' }}>
+                        Customer Email
+                      </label>
+                      <p style={{ margin: 0, color: 'var(--text-secondary)' }}>{selectedOrder.customerEmail || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <label className="font-semibold" style={{ display: 'block', marginBottom: 'var(--space-1)', color: 'var(--text-primary)' }}>
+                        Phone Number
+                      </label>
+                      <p style={{ margin: 0, color: 'var(--text-secondary)' }}>{selectedOrder.customerPhone || 'N/A'}</p>
+                    </div>
+                    <div style={{ gridColumn: 'span 1' }}>
+                      <label className="font-semibold" style={{ display: 'block', marginBottom: 'var(--space-1)', color: 'var(--text-primary)' }}>
+                        Shipping Address
+                      </label>
+                      <p style={{ margin: 0, color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+                        {selectedOrder.shippingAddress || 'N/A'}
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Order Items */}
-                {selectedOrder.items && selectedOrder.items.length > 0 && (
-                  <div>
-                    <label className="font-semibold" style={{ display: 'block', marginBottom: 'var(--space-3)', color: 'var(--text-primary)' }}>
-                      Order Items
-                    </label>
-                    <table className="table">
-                      <thead>
-                        <tr>
-                          <th>Product</th>
-                          <th>SKU</th>
-                          <th>Qty</th>
-                          <th>Unit Price</th>
-                          <th>Total</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {selectedOrder.items.map((item, index) => (
-                          <tr key={index}>
-                            <td className="text-sm">{item.product_name}</td>
-                            <td className="text-sm">{item.product_sku}</td>
-                            <td className="text-sm">{item.quantity}</td>
-                            <td className="text-sm">${parseFloat(item.unit_price).toFixed(2)}</td>
-                            <td className="text-sm font-semibold">
-                              ${parseFloat(item.total_price).toFixed(2)}
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-3)' }}>
+                    <h4 style={{ margin: 0, color: 'var(--text-primary)' }}>📦 Order Items</h4>
+                    <button
+                      onClick={() => handleDownloadInvoice(selectedOrder)}
+                      className="btn btn-outline"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        backgroundColor: 'var(--primary-light)',
+                        borderColor: 'var(--primary-medium)',
+                        color: 'var(--primary-dark)'
+                      }}
+                    >
+                      📄 Download Invoice
+                    </button>
+                  </div>
+                  
+                  {selectedOrder.items && selectedOrder.items.length > 0 ? (
+                    <div style={{ border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+                      <table className="table" style={{ margin: 0 }}>
+                        <thead style={{ backgroundColor: 'var(--bg-accent)' }}>
+                          <tr>
+                            <th style={{ padding: 'var(--space-3)' }}>Product</th>
+                            <th style={{ padding: 'var(--space-3)' }}>SKU</th>
+                            <th style={{ padding: 'var(--space-3)', textAlign: 'center' }}>Qty</th>
+                            <th style={{ padding: 'var(--space-3)', textAlign: 'right' }}>Unit Price</th>
+                            <th style={{ padding: 'var(--space-3)', textAlign: 'right' }}>Total</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selectedOrder.items.map((item, index) => (
+                            <tr key={index} style={{ borderBottom: index < selectedOrder.items.length - 1 ? '1px solid var(--border-light)' : 'none' }}>
+                              <td style={{ padding: 'var(--space-3)' }}>
+                                <div style={{ fontWeight: '500' }}>{item.product_name}</div>
+                              </td>
+                              <td style={{ padding: 'var(--space-3)' }}>
+                                <code style={{ backgroundColor: 'var(--bg-accent)', padding: '2px 6px', borderRadius: '4px', fontSize: '12px' }}>
+                                  {item.product_sku}
+                                </code>
+                              </td>
+                              <td style={{ padding: 'var(--space-3)', textAlign: 'center' }}>
+                                <span style={{ 
+                                  backgroundColor: 'var(--primary-light)', 
+                                  color: 'var(--primary-dark)',
+                                  padding: '4px 8px',
+                                  borderRadius: '12px',
+                                  fontSize: '12px',
+                                  fontWeight: '500'
+                                }}>
+                                  {item.quantity}
+                                </span>
+                              </td>
+                              <td style={{ padding: 'var(--space-3)', textAlign: 'right' }}>
+                                £{parseFloat(item.unit_price).toFixed(2)}
+                              </td>
+                              <td style={{ padding: 'var(--space-3)', textAlign: 'right', fontWeight: '500' }}>
+                                £{parseFloat(item.total_price).toFixed(2)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot style={{ backgroundColor: 'var(--success-light)' }}>
+                          <tr>
+                            <td colSpan="4" style={{ padding: 'var(--space-3)', textAlign: 'right', fontWeight: '600', color: 'var(--success-dark)' }}>
+                              Total Order Value:
+                            </td>
+                            <td style={{ padding: 'var(--space-3)', textAlign: 'right', fontWeight: '700', fontSize: '18px', color: 'var(--success-dark)' }}>
+                              £{selectedOrder.totalValue.toFixed(2)}
                             </td>
                           </tr>
-                        ))}
-                        <tr style={{ backgroundColor: 'var(--bg-accent)' }}>
-                          <td colSpan="4" className="text-sm font-semibold" style={{ textAlign: 'right' }}>
-                            Total Order Value:
-                          </td>
-                          <td className="text-sm font-bold">
-                            ${selectedOrder.totalValue.toFixed(2)}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-
-                {/* Notes */}
-                {selectedOrder.notes && (
-                  <div>
-                    <label className="font-semibold" style={{ display: 'block', marginBottom: 'var(--space-1)', color: 'var(--text-primary)' }}>
-                      Order Notes
-                    </label>
-                    <p style={{ margin: 0, color: 'var(--text-secondary)' }}>{selectedOrder.notes}</p>
-                  </div>
-                )}
-
-                {/* Status Info */}
-                <div>
-                  <label className="font-semibold" style={{ display: 'block', marginBottom: 'var(--space-1)', color: 'var(--text-primary)' }}>
-                    Current Status
-                  </label>
-                  <span className={`badge ${
-                    selectedOrder.status === 'pending' ? 'badge-warning' :
-                    selectedOrder.status === 'approved' ? 'badge-success' :
-                    'badge-error'
-                  }`}>
-                    {selectedOrder.status.charAt(0).toUpperCase() + selectedOrder.status.slice(1)}
-                  </span>
+                        </tfoot>
+                      </table>
+                    </div>
+                  ) : (
+                    <div style={{ 
+                      border: '1px solid var(--border-light)', 
+                      borderRadius: 'var(--radius-md)', 
+                      padding: 'var(--space-6)',
+                      textAlign: 'center',
+                      backgroundColor: 'var(--bg-accent)',
+                      color: 'var(--text-secondary)'
+                    }}>
+                      <p style={{ margin: 0, fontSize: '14px' }}>
+                        📦 No order items found. This might indicate an issue with order data loading.
+                      </p>
+                      <p style={{ margin: '8px 0 0 0', fontSize: '12px' }}>
+                        Debug info: {selectedOrder.items ? `Items array length: ${selectedOrder.items.length}` : 'Items array is null/undefined'}
+                      </p>
+                    </div>
+                  )}
                 </div>
 
-                {/* Rejection Reason */}
-                {selectedOrder.status === 'rejected' && selectedOrder.rejectionReason && (
-                  <div>
-                    <label className="font-semibold" style={{ display: 'block', marginBottom: 'var(--space-1)', color: 'var(--error)' }}>
-                      Rejection Reason
-                    </label>
-                    <p style={{ margin: 0, color: 'var(--error)' }}>{selectedOrder.rejectionReason}</p>
-                  </div>
-                )}
+                {/* Additional Information */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
+                  {/* Notes */}
+                  {selectedOrder.notes && (
+                    <div style={{ backgroundColor: 'var(--bg-accent)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)' }}>
+                      <label className="font-semibold" style={{ display: 'block', marginBottom: 'var(--space-2)', color: 'var(--text-primary)' }}>
+                        📝 Order Notes
+                      </label>
+                      <p style={{ margin: 0, color: 'var(--text-secondary)', fontStyle: 'italic', lineHeight: '1.5' }}>
+                        "{selectedOrder.notes}"
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Rejection Reason */}
+                  {selectedOrder.status === 'rejected' && selectedOrder.rejectionReason && (
+                    <div style={{ backgroundColor: 'var(--error-light)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', border: '1px solid var(--error)' }}>
+                      <label className="font-semibold" style={{ display: 'block', marginBottom: 'var(--space-2)', color: 'var(--error)' }}>
+                        ❌ Rejection Reason
+                      </label>
+                      <p style={{ margin: 0, color: 'var(--error)', fontWeight: '500' }}>{selectedOrder.rejectionReason}</p>
+                    </div>
+                  )}
+                </div>
 
                 {/* Actions */}
-                {selectedOrder.status === 'pending' && (
-                  <div style={{ display: 'flex', gap: 'var(--space-3)', paddingTop: 'var(--space-4)', borderTop: '1px solid var(--border-light)' }}>
+                <div style={{ 
+                  display: 'flex', 
+                  gap: 'var(--space-3)', 
+                  paddingTop: 'var(--space-4)', 
+                  borderTop: '2px solid var(--border-light)',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center' }}>
+                    {selectedOrder.status === 'pending' && (
+                      <>
+                        <button
+                          onClick={() => handleStatusChange(selectedOrder.id, 'approved')}
+                          className="btn btn-secondary"
+                          style={{
+                            backgroundColor: 'var(--success)',
+                            border: 'none',
+                            color: 'white',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            padding: 'var(--space-3) var(--space-4)'
+                          }}
+                        >
+                          ✅ Approve Order & Send Payment Link
+                        </button>
+                        <button
+                          onClick={() => {
+                            const reason = prompt('Rejection reason:');
+                            if (reason) handleStatusChange(selectedOrder.id, 'rejected', reason);
+                          }}
+                          className="btn btn-secondary"
+                          style={{
+                            backgroundColor: 'var(--error)',
+                            border: 'none',
+                            color: 'white',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            padding: 'var(--space-3) var(--space-4)'
+                          }}
+                        >
+                          ❌ Reject Order
+                        </button>
+                      </>
+                    )}
+                    {selectedOrder.status === 'approved' && (
+                      <button
+                        onClick={() => handleSendPaymentLink(selectedOrder)}
+                        className="btn btn-secondary"
+                        style={{
+                          backgroundColor: 'var(--primary-medium)',
+                          border: 'none',
+                          color: 'white',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          padding: 'var(--space-3) var(--space-4)'
+                        }}
+                      >
+                        💳 Resend Payment Link
+                      </button>
+                    )}
+                  </div>
+                  
+                  <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
                     <button
-                      onClick={() => handleStatusChange(selectedOrder.id, 'approved')}
-                      className="btn btn-secondary"
+                      onClick={() => handleDownloadInvoice(selectedOrder)}
+                      className="btn btn-outline"
                       style={{
-                        backgroundColor: 'var(--success)',
-                        cursor: 'pointer'
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        backgroundColor: 'var(--primary-light)',
+                        borderColor: 'var(--primary-medium)',
+                        color: 'var(--primary-dark)'
                       }}
                     >
-                      ✅ Approve Order
-                    </button>
-                    <button
-                      onClick={() => {
-                        const reason = prompt('Rejection reason:');
-                        if (reason) handleStatusChange(selectedOrder.id, 'rejected', reason);
-                      }}
-                      className="btn btn-secondary"
-                      style={{
-                        backgroundColor: 'var(--error)',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      ❌ Reject Order
+                      📄 Download Invoice
                     </button>
                   </div>
-                )}
+                </div>
               </div>
             </div>
           </div>

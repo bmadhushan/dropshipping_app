@@ -7,8 +7,12 @@
   --neutral: #92A294;
   --button-primary: #354F52;
   --error: #dc2626;
+  --error-light: rgba(220, 38, 38, 0.1);
+  --primary-light-rgba: rgba(157, 186, 145, 0.2);
   --success: #059669;
   --warning: #d97706;
+  --surface: #f8f9fa;
+  --surface-light: #f1f3f4;
 }
 
 /* Modal Container */
@@ -284,8 +288,13 @@
 }
 
 .mapping-select.required {
-  border-color: var(--success);
-  background: rgba(5, 150, 105, 0.05);
+  border-color: var(--error);
+  background: var(--error-light);
+}
+
+.mapping-select.core {
+  border-color: var(--primary-light);
+  background: var(--primary-light-rgba);
 }
 
 .suggestion-buttons {

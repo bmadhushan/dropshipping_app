@@ -27,6 +27,9 @@ class ApiService {
   }
 
   async request(endpoint, options = {}) {
+    // Refresh token from localStorage in case it was updated
+    this.token = localStorage.getItem('auth_token');
+    
     const url = `${API_BASE_URL}${endpoint}`;
     const config = {
       headers: this.getHeaders(),
@@ -34,11 +37,22 @@ class ApiService {
     };
 
     try {
+      console.log('Making API request to:', url);
+      console.log('Request config:', config);
+      
       const response = await fetch(url, config);
       const data = await response.json();
 
+      console.log('API response status:', response.status);
+      console.log('API response data:', data);
+
       if (!response.ok) {
-        throw new Error(data.message || 'An error occurred');
+        // Include validation errors if they exist
+        let errorMessage = data.message || 'An error occurred';
+        if (data.errors && Array.isArray(data.errors)) {
+          errorMessage += ': ' + data.errors.map(err => err.msg || err.message).join(', ');
+        }
+        throw new Error(errorMessage);
       }
 
       return data;
@@ -238,7 +252,7 @@ class ApiService {
     return await this.request(`/seller-products/catalog${params ? `?${params}` : ''}`);
   }
 
-  async selectProduct(productId, customMargin, customPrice, isSelected) {
+  async selectProduct(productId, customMargin, customPrice, isSelected, customShippingFee) {
     return await this.request('/seller-products/select', {
       method: 'POST',
       body: JSON.stringify({
@@ -246,14 +260,15 @@ class ApiService {
         customMargin,
         customPrice,
         isSelected,
+        customShippingFee,
       }),
     });
   }
 
-  async updateProductPricing(productId, customMargin, customPrice) {
+  async updateProductPricing(productId, customMargin, customPrice, customShippingFee) {
     return await this.request(`/seller-products/pricing/${productId}`, {
       method: 'PATCH',
-      body: JSON.stringify({ customMargin, customPrice }),
+      body: JSON.stringify({ customMargin, customPrice, customShippingFee }),
     });
   }
 
@@ -311,9 +326,25 @@ class ApiService {
   }
 
   // Category endpoints
-  async getCategories(includeInactive = false) {
+  async getCategories(includeInactive = false, hierarchical = false) {
+    const params = new URLSearchParams();
+    if (includeInactive) params.append('includeInactive', 'true');
+    if (hierarchical) params.append('hierarchical', 'true');
+    const queryString = params.toString();
+    return await this.request(`/categories${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async getCategoriesHierarchy(includeInactive = false) {
     const params = includeInactive ? '?includeInactive=true' : '';
-    return await this.request(`/categories${params}`);
+    return await this.request(`/categories/hierarchy${params}`);
+  }
+
+  async getRootCategories() {
+    return await this.request('/categories/root');
+  }
+
+  async getCategoryChildren(parentId) {
+    return await this.request(`/categories/${parentId}/children`);
   }
 
   async getActiveCategories() {
@@ -332,15 +363,33 @@ class ApiService {
   }
 
   async updateCategory(id, categoryData) {
-    return await this.request(`/categories/${id}`, {
+    console.log('🔧 API Service updateCategory called with:', { id, categoryData });
+    console.log('🔑 Current token:', this.token);
+    
+    const result = await this.request(`/categories/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(categoryData),
     });
+    
+    console.log('📤 updateCategory result:', result);
+    return result;
   }
 
   async toggleCategoryStatus(id) {
     return await this.request(`/categories/${id}/toggle-status`, {
       method: 'PATCH',
+    });
+  }
+
+  // Settings methods
+  async getConversionRate() {
+    return await this.request('/settings/conversion-rate');
+  }
+
+  async updateConversionRate(rate) {
+    return await this.request('/settings/conversion-rate', {
+      method: 'POST',
+      body: JSON.stringify({ rate }),
     });
   }
 

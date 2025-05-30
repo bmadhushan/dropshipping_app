@@ -5,6 +5,7 @@ import OrderForm from '../../components/OrderForm.jsx';
 import SellerLayout from '../../components/layout/SellerLayout.jsx';
 import '../../styles/theme.css';
 import logoSvg from '../../assets/logo animation_1.svg';
+import { ShoppingCart, Package, DollarSign, BarChart3, TrendingUp, TrendingDown, Activity, ClipboardList, Download, Plus } from 'lucide-react';
 
 const SellerDashboardPage = () => {
   const navigate = useNavigate();
@@ -87,22 +88,22 @@ const SellerDashboardPage = () => {
               fontSize: '14px',
               color: trend > 0 ? 'var(--success)' : 'var(--error)' 
             }}>
-              <span>{trend > 0 ? '↗️' : '↘️'}</span>
+              {trend > 0 ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
               <span style={{ marginLeft: '4px' }}>{Math.abs(trend)}% vs last month</span>
             </div>
           )}
         </div>
-        <div style={{ fontSize: '2rem', color: 'var(--primary-medium)' }}>{icon}</div>
+        <div style={{ color: 'var(--primary-medium)' }}>{icon}</div>
       </div>
     </div>
   );
 
   const getActivityIcon = (type) => {
     switch (type) {
-      case 'order': return '🛒';
-      case 'product': return '📦';
-      case 'inventory': return '📊';
-      default: return '📝';
+      case 'order': return <ShoppingCart size={20} />;
+      case 'product': return <Package size={20} />;
+      case 'inventory': return <BarChart3 size={20} />;
+      default: return <Activity size={20} />;
     }
   };
 
@@ -125,16 +126,18 @@ const SellerDashboardPage = () => {
               <button 
                 onClick={() => setShowOrderForm(true)}
                 className="btn btn-primary"
-                style={{ cursor: 'pointer' }}
+                style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
               >
-                🛒 Create Order
+                <ShoppingCart size={20} />
+                Create Order
               </button>
               <button 
                 onClick={() => window.location.href = '/seller/orders'}
                 className="btn btn-secondary"
-                style={{ cursor: 'pointer' }}
+                style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
               >
-                📋 View Orders
+                <ClipboardList size={20} />
+                View Orders
               </button>
             </div>
           </div>
@@ -150,28 +153,28 @@ const SellerDashboardPage = () => {
           title="Total Orders"
           value={stats.totalOrders}
           subtitle={`${stats.pendingOrders} pending review`}
-          icon="🛒"
+          icon={<ShoppingCart size={24} />}
           trend={15}
         />
         <StatCard
           title="Total Revenue"
-          value={`$${stats.totalRevenue.toFixed(2)}`}
+          value={`£${stats.totalRevenue.toFixed(2)}`}
           subtitle="From approved orders"
-          icon="💰"
+          icon={<DollarSign size={24} />}
           trend={24}
         />
         <StatCard
           title="Active Products"
           value={stats.activeProducts}
           subtitle={`${stats.totalProducts} total products`}
-          icon="📦"
+          icon={<Package size={24} />}
           trend={12}
         />
         <StatCard
           title="Avg Order Value"
-          value={`$${stats.avgOrderValue.toFixed(2)}`}
+          value={`£${stats.avgOrderValue.toFixed(2)}`}
           subtitle="Per wholesale order"
-          icon="📊"
+          icon={<BarChart3 size={24} />}
           trend={8}
         />
       </div>
@@ -225,7 +228,7 @@ const SellerDashboardPage = () => {
                     <tr key={order.id}>
                       <td className="font-medium">{order.id}</td>
                       <td>{order.products} items</td>
-                      <td className="font-semibold">${order.amount.toFixed(2)}</td>
+                      <td className="font-semibold">£{order.amount.toFixed(2)}</td>
                       <td>
                         <span className={`badge ${
                           order.status === 'pending' ? 'badge-warning' :
@@ -306,7 +309,7 @@ const SellerDashboardPage = () => {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="font-semibold text-sm" style={{ color: 'var(--primary-dark)' }}>${product.revenue.toFixed(2)}</p>
+                    <p className="font-semibold text-sm" style={{ color: 'var(--primary-dark)' }}>£{product.revenue.toFixed(2)}</p>
                   </div>
                 </div>
               ))}
@@ -326,7 +329,7 @@ const SellerDashboardPage = () => {
                 className="quick-action"
                 style={{ cursor: 'pointer' }}
               >
-                <div className="quick-action-icon">🛒</div>
+                <div className="quick-action-icon"><ShoppingCart size={24} /></div>
                 <span className="quick-action-label">Create New Order</span>
               </button>
               <button 
@@ -334,7 +337,7 @@ const SellerDashboardPage = () => {
                 className="quick-action"
                 style={{ cursor: 'pointer' }}
               >
-                <div className="quick-action-icon">📋</div>
+                <div className="quick-action-icon"><ClipboardList size={24} /></div>
                 <span className="quick-action-label">View All Orders</span>
               </button>
               <button 
@@ -342,7 +345,7 @@ const SellerDashboardPage = () => {
                 className="quick-action"
                 style={{ cursor: 'pointer' }}
               >
-                <div className="quick-action-icon">📦</div>
+                <div className="quick-action-icon"><Package size={24} /></div>
                 <span className="quick-action-label">Manage Products</span>
               </button>
               <button 
@@ -350,7 +353,7 @@ const SellerDashboardPage = () => {
                 className="quick-action"
                 style={{ cursor: 'pointer' }}
               >
-                <div className="quick-action-icon">📊</div>
+                <div className="quick-action-icon"><Download size={24} /></div>
                 <span className="quick-action-label">Export Data</span>
               </button>
             </div>

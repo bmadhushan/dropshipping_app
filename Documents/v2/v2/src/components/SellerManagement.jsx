@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { Eye, CheckCircle, XCircle, Pause, Play, User, Mail, Phone, Building, MapPin, Calendar, Tag, X } from 'lucide-react';
 import '../styles/theme.css';
 
 const SellerManagement = () => {
@@ -132,11 +133,11 @@ const SellerManagement = () => {
         {/* Filter Tabs */}
         <div style={{ marginBottom: 'var(--space-6)' }}>
           {[
-            { key: 'all', label: 'All Sellers', count: sellers.length },
-            { key: 'pending', label: 'Pending', count: sellers.filter(s => s.status === 'pending').length },
-            { key: 'active', label: 'Active', count: sellers.filter(s => s.status === 'active').length },
-            { key: 'suspended', label: 'Suspended', count: sellers.filter(s => s.status === 'suspended').length },
-            { key: 'rejected', label: 'Rejected', count: sellers.filter(s => s.status === 'rejected').length }
+            { key: 'all', label: 'All Sellers', count: sellers.length, icon: '👥' },
+            { key: 'pending', label: 'Pending', count: sellers.filter(s => s.status === 'pending').length, icon: '⏳' },
+            { key: 'active', label: 'Active', count: sellers.filter(s => s.status === 'active').length, icon: '✅' },
+            { key: 'suspended', label: 'Suspended', count: sellers.filter(s => s.status === 'suspended').length, icon: '⏸️' },
+            { key: 'rejected', label: 'Rejected', count: sellers.filter(s => s.status === 'rejected').length, icon: '❌' }
           ].map(tab => (
             <button
               key={tab.key}
@@ -144,9 +145,13 @@ const SellerManagement = () => {
               className={filter === tab.key ? 'btn btn-primary' : 'btn btn-outline'}
               style={{
                 marginRight: 'var(--space-2)',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 'var(--space-1)'
               }}
             >
+              <span>{tab.icon}</span>
               {tab.label} ({tab.count})
             </button>
           ))}
@@ -157,12 +162,30 @@ const SellerManagement = () => {
           <table className="table">
             <thead>
               <tr>
-                <th>Business</th>
-                <th>Contact</th>
-                <th>Type</th>
-                <th>Categories</th>
-                <th>Status</th>
-                <th>Submitted</th>
+                <th style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
+                  <Building size={16} />
+                  Business
+                </th>
+                <th style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
+                  <User size={16} />
+                  Contact
+                </th>
+                <th style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
+                  <Tag size={16} />
+                  Type
+                </th>
+                <th style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
+                  <Tag size={16} />
+                  Categories
+                </th>
+                <th style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
+                  <CheckCircle size={16} />
+                  Status
+                </th>
+                <th style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
+                  <Calendar size={16} />
+                  Submitted
+                </th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -177,8 +200,14 @@ const SellerManagement = () => {
                   </td>
                   <td>
                     <div className="text-sm">
-                      <div>{seller.email}</div>
-                      <div style={{ color: 'var(--text-secondary)' }}>{seller.phone}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)', marginBottom: '2px' }}>
+                        <Mail size={12} style={{ color: 'var(--text-secondary)' }} />
+                        {seller.email}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)', color: 'var(--text-secondary)' }}>
+                        <Phone size={12} />
+                        {seller.phone}
+                      </div>
                     </div>
                   </td>
                   <td style={{ textTransform: 'capitalize' }}>{seller.businessType}</td>
@@ -212,9 +241,13 @@ const SellerManagement = () => {
                         style={{
                           cursor: 'pointer',
                           fontSize: '12px',
-                          padding: 'var(--space-1) var(--space-3)'
+                          padding: 'var(--space-1) var(--space-3)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 'var(--space-1)'
                         }}
                       >
+                        <Eye size={12} />
                         View
                       </button>
                       {seller.status === 'pending' && (
@@ -226,9 +259,13 @@ const SellerManagement = () => {
                               cursor: 'pointer',
                               fontSize: '12px',
                               padding: 'var(--space-1) var(--space-3)',
-                              backgroundColor: 'var(--success)'
+                              backgroundColor: 'var(--success)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 'var(--space-1)'
                             }}
                           >
+                            <CheckCircle size={12} />
                             Approve
                           </button>
                           <button
@@ -241,9 +278,13 @@ const SellerManagement = () => {
                               cursor: 'pointer',
                               fontSize: '12px',
                               padding: 'var(--space-1) var(--space-3)',
-                              backgroundColor: 'var(--error)'
+                              backgroundColor: 'var(--error)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 'var(--space-1)'
                             }}
                           >
+                            <XCircle size={12} />
                             Reject
                           </button>
                         </>
@@ -256,9 +297,13 @@ const SellerManagement = () => {
                             cursor: 'pointer',
                             fontSize: '12px',
                             padding: 'var(--space-1) var(--space-3)',
-                            backgroundColor: 'var(--warning)'
+                            backgroundColor: 'var(--warning)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 'var(--space-1)'
                           }}
                         >
+                          <Pause size={12} />
                           Suspend
                         </button>
                       )}
@@ -270,9 +315,13 @@ const SellerManagement = () => {
                             cursor: 'pointer',
                             fontSize: '12px',
                             padding: 'var(--space-1) var(--space-3)',
-                            backgroundColor: 'var(--success)'
+                            backgroundColor: 'var(--success)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 'var(--space-1)'
                           }}
                         >
+                          <Play size={12} />
                           Activate
                         </button>
                       )}
@@ -319,19 +368,24 @@ const SellerManagement = () => {
                 style={{
                   backgroundColor: 'transparent',
                   border: 'none',
-                  fontSize: '24px',
                   cursor: 'pointer',
-                  color: 'var(--text-secondary)'
+                  color: 'var(--text-secondary)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '4px'
                 }}
               >
-                ×
+                <X size={20} />
               </button>
             </div>
 
             <div style={{ display: 'grid', gap: 'var(--space-4)' }}>
               {/* Account Information */}
               <div style={{ borderBottom: '1px solid var(--border-light)', paddingBottom: 'var(--space-4)' }}>
-                <h4 style={{ marginBottom: 'var(--space-3)', color: 'var(--primary-dark)' }}>Account Information</h4>
+                <h4 style={{ marginBottom: 'var(--space-3)', color: 'var(--primary-dark)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                  <User size={18} />
+                  Account Information
+                </h4>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
                   <div>
                     <label className="font-semibold" style={{ display: 'block', marginBottom: 'var(--space-1)', color: 'var(--text-primary)' }}>Username</label>
@@ -353,7 +407,10 @@ const SellerManagement = () => {
 
               {/* Business Information */}
               <div style={{ borderBottom: '1px solid var(--border-light)', paddingBottom: 'var(--space-4)' }}>
-                <h4 style={{ marginBottom: 'var(--space-3)', color: 'var(--primary-dark)' }}>Business Information</h4>
+                <h4 style={{ marginBottom: 'var(--space-3)', color: 'var(--primary-dark)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                  <Building size={18} />
+                  Business Information
+                </h4>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
                   <div>
                     <label className="font-semibold" style={{ display: 'block', marginBottom: 'var(--space-1)', color: 'var(--text-primary)' }}>Business Name</label>
@@ -388,7 +445,10 @@ const SellerManagement = () => {
 
               {/* Category Interests */}
               <div style={{ borderBottom: '1px solid var(--border-light)', paddingBottom: 'var(--space-4)' }}>
-                <label className="font-semibold" style={{ display: 'block', marginBottom: 'var(--space-2)', color: 'var(--text-primary)' }}>Category Interests</label>
+                <label className="font-semibold" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)', color: 'var(--text-primary)' }}>
+                  <Tag size={16} />
+                  Category Interests
+                </label>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
                   {selectedSeller.categoryInterests?.map(category => (
                     <span key={category} className="badge badge-info">
@@ -408,7 +468,10 @@ const SellerManagement = () => {
 
               {/* Timeline */}
               <div>
-                <h4 style={{ marginBottom: 'var(--space-3)', color: 'var(--primary-dark)' }}>Timeline</h4>
+                <h4 style={{ marginBottom: 'var(--space-3)', color: 'var(--primary-dark)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                  <Calendar size={18} />
+                  Timeline
+                </h4>
                 <div style={{ display: 'grid', gap: 'var(--space-2)' }}>
                   <div>
                     <label className="font-semibold" style={{ display: 'inline', color: 'var(--text-primary)' }}>Registration Date:</label>
@@ -446,9 +509,13 @@ const SellerManagement = () => {
                       className="btn btn-secondary"
                       style={{
                         backgroundColor: 'var(--success)',
-                        cursor: 'pointer'
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 'var(--space-2)'
                       }}
                     >
+                      <CheckCircle size={16} />
                       Approve Seller
                     </button>
                     <button
@@ -459,9 +526,13 @@ const SellerManagement = () => {
                       className="btn btn-secondary"
                       style={{
                         backgroundColor: 'var(--error)',
-                        cursor: 'pointer'
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 'var(--space-2)'
                       }}
                     >
+                      <XCircle size={16} />
                       Reject Application
                     </button>
                   </>
@@ -472,9 +543,13 @@ const SellerManagement = () => {
                     className="btn btn-secondary"
                     style={{
                       backgroundColor: 'var(--warning)',
-                      cursor: 'pointer'
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 'var(--space-2)'
                     }}
                   >
+                    <Pause size={16} />
                     Suspend Seller
                   </button>
                 )}
@@ -484,9 +559,13 @@ const SellerManagement = () => {
                     className="btn btn-secondary"
                     style={{
                       backgroundColor: 'var(--success)',
-                      cursor: 'pointer'
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 'var(--space-2)'
                     }}
                   >
+                    <Play size={16} />
                     Reactivate Seller
                   </button>
                 )}

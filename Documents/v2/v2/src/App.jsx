@@ -19,10 +19,13 @@ import SellerProfilePage from './pages/seller/SellerProfilePage.jsx';
 
 // Import Admin Pages
 import AdminDashboardPage from './pages/admin/AdminDashboardPage.jsx';
+import TestAdminPage from './TestAdminPage.jsx';
+import SafeAdminDashboard from './SafeAdminDashboard.jsx';
 import AdminPricingSettingsPage from './pages/admin/AdminPricingSettingsPage.jsx';
 import AdminProductManagementPage from './pages/admin/AdminProductManagementPage.jsx';
 import AdminOrderReviewPage from './pages/admin/AdminOrderReviewPage.jsx';
 import AdminCategoryManagementPage from './pages/admin/AdminCategoryManagementPage.jsx';
+import AdminBulkPublishPage from './pages/admin/AdminBulkPublishPage.jsx';
 
 // Simple Layout Component for public pages
 const SimpleLayout = ({ children }) => (
@@ -68,31 +71,49 @@ const ProtectedRoute = ({ allowedRoles, children }) => {
 // Complete Admin Panel
 const AdminPanel = () => {
   const [currentPage, setCurrentPage] = useState('dashboard');
+  const { currentUser, userRole } = useAuth();
 
-  const renderContent = () => {
-    switch (currentPage) {
-      case 'dashboard':
-        return <AdminDashboardPage setCurrentPage={setCurrentPage} />;
-      case 'sellers':
-        return <SellerManagement />;
-      case 'products':
-        return <AdminProductManagementPage darkMode={false} />;
-      case 'categories':
-        return <AdminCategoryManagementPage />;
-      case 'pricing':
-        return <AdminPricingSettingsPage darkMode={false} />;
-      case 'orders':
-        return <AdminOrderReviewPage />;
-      default:
-        return <AdminDashboardPage setCurrentPage={setCurrentPage} />;
-    }
-  };
+  console.log('AdminPanel render - currentUser:', currentUser);
+  console.log('AdminPanel render - userRole:', userRole);
+  console.log('AdminPanel render - currentPage:', currentPage);
 
-  return (
-    <AdminLayout currentPage={currentPage} setCurrentPage={setCurrentPage}>
-      {renderContent()}
-    </AdminLayout>
-  );
+  // Add error boundary
+  try {
+    const renderContent = () => {
+      console.log('Rendering content for page:', currentPage);
+      switch (currentPage) {
+        case 'dashboard':
+          return <SafeAdminDashboard setCurrentPage={setCurrentPage} />;
+        case 'sellers':
+          return <SellerManagement />;
+        case 'products':
+          return <AdminProductManagementPage darkMode={false} />;
+        case 'categories':
+          return <AdminCategoryManagementPage />;
+        case 'pricing':
+          return <AdminPricingSettingsPage darkMode={false} />;
+        case 'orders':
+          return <AdminOrderReviewPage />;
+        default:
+          return <SafeAdminDashboard setCurrentPage={setCurrentPage} />;
+      }
+    };
+
+    return (
+      <AdminLayout currentPage={currentPage} setCurrentPage={setCurrentPage}>
+        {renderContent()}
+      </AdminLayout>
+    );
+  } catch (error) {
+    console.error('AdminPanel error:', error);
+    return (
+      <div style={{ padding: '20px', color: 'red' }}>
+        <h2>Error in Admin Panel</h2>
+        <p>{error.message}</p>
+        <pre>{error.stack}</pre>
+      </div>
+    );
+  }
 };
 
 // Seller Routes Component
@@ -130,6 +151,9 @@ function App() {
                 <AdminPanel />
               </ProtectedRoute>
             } />
+            
+            {/* Admin Bulk Publish Popup - No auth wrapper needed since it handles auth internally */}
+            <Route path="/admin/bulk-publish" element={<AdminBulkPublishPage />} />
 
             {/* Seller Routes */}
             <Route path="/seller/*" element={

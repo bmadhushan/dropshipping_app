@@ -1,10 +1,15 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import SellerLayout from '../../components/layout/SellerLayout.jsx';
 import ProductCard from '../../components/seller/ProductCard.jsx';
+import OrderModal from '../../components/modals/OrderModal.jsx';
+import ProductDetailModal from '../../components/modals/ProductDetailModal.jsx';
 import { useProducts } from '../../contexts/ProductContext.jsx';
+import apiService from '../../services/api.js';
 import '../../styles/seller.css';
 
 const SellerProductPanelPage = () => {
+  const navigate = useNavigate();
   const { 
     getProductsWithPricing, 
     toggleProductSelection, 
@@ -39,6 +44,27 @@ const SellerProductPanelPage = () => {
   const [bulkMarginAdjustment, setBulkMarginAdjustment] = useState(0);
   const [bulkPricingMethod, setBulkPricingMethod] = useState('adjust');
   const [bulkMarginSet, setBulkMarginSet] = useState(20);
+  const [bulkShippingFee, setBulkShippingFee] = useState(0);
+  const [showOrderModal, setShowOrderModal] = useState(false);
+  const [orderStep, setOrderStep] = useState(1); // 1: Items, 2: Customer Details, 3: Order Overview
+  const [orderItems, setOrderItems] = useState({});
+  const [orderForm, setOrderForm] = useState({
+    customerName: '',
+    customerAddress: '',
+    customerPhone: '',
+    customerEmail: '',
+    notes: ''
+  });
+  
+  // Product Detail Modal State
+  const [showProductModal, setShowProductModal] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [selectedProductIndex, setSelectedProductIndex] = useState(0);
+
+  // Debounced update function to prevent rapid re-renders
+  const updateOrderForm = React.useCallback((field, value) => {
+    setOrderForm(prev => ({ ...prev, [field]: value }));
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -104,7 +130,7 @@ const SellerProductPanelPage = () => {
     const exportData = products.filter(product => selectedForBulk.has(product.id));
     
     // Convert to CSV
-    const headers = ['SKU', 'Name', 'Description', 'Category', 'Brand', 'Admin Price (USD)', 'Your Price (LKR)', 'Stock', 'Weight', 'Dimensions', 'Image'];
+    const headers = ['SKU', 'Name', 'Description', 'Category', 'Brand', 'Admin Price (GBP)', 'Your Price (LKR)', 'Stock', 'Weight', 'Dimensions', 'Image'];
     const csvContent = [
       headers.join(','),
       ...exportData.map(product => [
@@ -184,64 +210,194 @@ const SellerProductPanelPage = () => {
   const selectedCount = products.filter(p => p.isSelected).length;
 
   const PricingModal = ({ product, onSave, onClose }) => {
-    const [customMargin, setCustomMargin] = useState(product.customMargin || 
-      pricingSettings.categories[product.category]?.margin || 
-      pricingSettings.global.defaultMargin);
-    const [customPrice, setCustomPrice] = useState(product.sellerPrice);
-    const [useCustomPrice, setUseCustomPrice] = useState(false);
-
-    const calculatePrice = (margin) => {
+    const initialMargin = product.customMargin !== null && product.customMargin !== undefined
+      ? product.customMargin
+      : (pricingSettings.categories[product.category]?.margin || pricingSettings.global.defaultMargin);
+    
+    const [customShippingCost, setCustomShippingCost] = useState(0); // Default shipping fee is 0
+    
+    const calculatePrice = (margin, shippingCost = customShippingCost) => {
       const converted = product.adminPrice * pricingSettings.global.currencyConversion;
       const withMargin = converted * (1 + margin / 100);
-      return withMargin + pricingSettings.global.shippingCost;
+      return withMargin + shippingCost;
     };
+    
+    const [customMargin, setCustomMargin] = useState(initialMargin);
+    const [customPrice, setCustomPrice] = useState(
+      product.customPrice || product.sellerPrice || calculatePrice(initialMargin)
+    );
+    const [useCustomPrice, setUseCustomPrice] = useState(
+      product.customPrice !== null && product.customPrice !== undefined
+    );
 
     const handleSave = () => {
       if (useCustomPrice) {
-        onSave(product.id, null, customPrice);
+        onSave(product.id, null, customPrice, customShippingCost);
       } else {
-        onSave(product.id, customMargin, null);
+        onSave(product.id, customMargin, null, customShippingCost);
       }
       onClose();
     };
 
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-lg max-w-md w-full p-6">
-          <h3 className="text-xl font-semibold mb-4">Adjust Pricing - {product.name}</h3>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">Admin Price (USD)</label>
-              <p className="text-lg font-semibold">${product.adminPrice.toFixed(2)}</p>
+      <>
+        {/* Modal Overlay */}
+        <div 
+          className="modal-overlay" 
+          onClick={onClose}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            zIndex: 9999,
+            animation: 'fadeIn 0.3s ease'
+          }}
+        />
+        
+        {/* Modal Container */}
+        <div 
+          className="pricing-modal"
+          style={{
+            position: 'fixed',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            background: '#FFFFFF',
+            borderRadius: '20px',
+            padding: '2.5rem',
+            boxShadow: '0 25px 50px rgba(53, 75, 74, 0.2)',
+            width: '90%',
+            maxWidth: '480px',
+            maxHeight: '90vh',
+            overflowY: 'auto',
+            zIndex: 10000,
+            animation: 'slideIn 0.3s ease'
+          }}
+        >
+          {/* Close Button */}
+          <button
+            onClick={onClose}
+            style={{
+              position: 'absolute',
+              top: '1rem',
+              right: '1rem',
+              background: 'none',
+              border: 'none',
+              fontSize: '2rem',
+              color: '#92A294',
+              cursor: 'pointer',
+              width: '40px',
+              height: '40px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '50%',
+              transition: 'all 0.2s ease'
+            }}
+            className="modal-close"
+          >
+            ×
+          </button>
+          
+          {/* Modal Header */}
+          <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+            <h3 style={{
+              fontSize: '1.5rem',
+              fontWeight: '700',
+              color: '#354B4A',
+              margin: '0 0 0.5rem 0'
+            }}>
+              Adjust Product Pricing
+            </h3>
+            <p style={{
+              fontSize: '0.95rem',
+              color: '#819878',
+              margin: '0'
+            }}>
+              {product.name}
+            </p>
+          </div>
+          <div style={{ marginBottom: '1.5rem' }}>
+            <div className="form-group">
+              <label className="form-label" style={{
+                display: 'block',
+                marginBottom: '0.5rem',
+                fontWeight: '600',
+                color: '#354B4A',
+                fontSize: '0.875rem'
+              }}>
+                Admin Price (GBP)
+              </label>
+              <p style={{
+                fontSize: '1.25rem',
+                fontWeight: '700',
+                color: '#354B4A',
+                margin: '0'
+              }}>
+                £{product.adminPrice.toFixed(2)}
+              </p>
             </div>
             
-            <div>
-              <label className="block text-sm font-medium mb-2">Pricing Method</label>
-              <div className="space-y-2">
-                <label className="flex items-center">
+            <div className="form-group" style={{ marginTop: '1.25rem' }}>
+              <label className="form-label" style={{
+                display: 'block',
+                marginBottom: '0.5rem',
+                fontWeight: '600',
+                color: '#354B4A',
+                fontSize: '0.875rem'
+              }}>
+                Pricing Method
+              </label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '0.75rem',
+                  backgroundColor: !useCustomPrice ? 'rgba(157, 186, 145, 0.1)' : '#F9FAFB',
+                  borderRadius: '10px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}>
                   <input
                     type="radio"
                     checked={!useCustomPrice}
                     onChange={() => setUseCustomPrice(false)}
-                    className="mr-2"
+                    style={{ marginRight: '0.75rem' }}
                   />
-                  <span>Use Margin Calculation</span>
+                  <span style={{ color: '#354B4A', fontSize: '0.95rem' }}>Use Margin Calculation</span>
                 </label>
-                <label className="flex items-center">
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '0.75rem',
+                  backgroundColor: useCustomPrice ? 'rgba(157, 186, 145, 0.1)' : '#F9FAFB',
+                  borderRadius: '10px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}>
                   <input
                     type="radio"
                     checked={useCustomPrice}
                     onChange={() => setUseCustomPrice(true)}
-                    className="mr-2"
+                    style={{ marginRight: '0.75rem' }}
                   />
-                  <span>Set Custom Price</span>
+                  <span style={{ color: '#354B4A', fontSize: '0.95rem' }}>Set Custom Price</span>
                 </label>
               </div>
             </div>
             
             {!useCustomPrice ? (
-              <div>
-                <label className="block text-sm font-medium mb-2">
+              <div className="form-group" style={{ marginTop: '1.25rem' }}>
+                <label className="form-label" style={{
+                  display: 'block',
+                  marginBottom: '0.5rem',
+                  fontWeight: '600',
+                  color: '#354B4A',
+                  fontSize: '0.875rem'
+                }}>
                   Margin (%) - Category Default: {pricingSettings.categories[product.category]?.margin || pricingSettings.global.defaultMargin}%
                 </label>
                 <input
@@ -252,60 +408,225 @@ const SellerProductPanelPage = () => {
                     setCustomMargin(margin);
                     setCustomPrice(calculatePrice(margin));
                   }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 1rem',
+                    border: '2px solid rgba(157, 186, 145, 0.3)',
+                    borderRadius: '10px',
+                    fontSize: '0.95rem',
+                    background: '#FFFFFF',
+                    color: '#354B4A',
+                    transition: 'all 0.3s ease'
+                  }}
+                  className="form-input"
                   min="0"
                   max="200"
                 />
               </div>
             ) : (
-              <div>
-                <label className="block text-sm font-medium mb-2">Custom Price (LKR)</label>
+              <div className="form-group" style={{ marginTop: '1.25rem' }}>
+                <label className="form-label" style={{
+                  display: 'block',
+                  marginBottom: '0.5rem',
+                  fontWeight: '600',
+                  color: '#354B4A',
+                  fontSize: '0.875rem'
+                }}>
+                  Custom Price (LKR)
+                </label>
                 <input
                   type="number"
                   step="0.01"
                   value={customPrice}
                   onChange={(e) => setCustomPrice(parseFloat(e.target.value) || 0)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 1rem',
+                    border: '2px solid rgba(157, 186, 145, 0.3)',
+                    borderRadius: '10px',
+                    fontSize: '0.95rem',
+                    background: '#FFFFFF',
+                    color: '#354B4A',
+                    transition: 'all 0.3s ease'
+                  }}
+                  className="form-input"
                   min="0"
                 />
               </div>
             )}
             
-            <div className="bg-gray-50 p-3 rounded">
-              <p className="text-sm font-medium mb-1">Price Calculation:</p>
-              <p className="text-xs text-gray-600">
-                Base: ${product.adminPrice} × {pricingSettings.global.currencyConversion} = 
-                LKR {(product.adminPrice * pricingSettings.global.currencyConversion).toFixed(2)}
+            {/* Shipping Fee Input */}
+            <div className="form-group" style={{ marginTop: '1.25rem' }}>
+              <label className="form-label" style={{
+                display: 'block',
+                marginBottom: '0.5rem',
+                fontWeight: '600',
+                color: '#354B4A',
+                fontSize: '0.875rem'
+              }}>
+                Shipping Fee (LKR)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                value={customShippingCost}
+                onChange={(e) => {
+                  const shippingCost = parseFloat(e.target.value) || 0;
+                  setCustomShippingCost(shippingCost);
+                  if (!useCustomPrice) {
+                    setCustomPrice(calculatePrice(customMargin, shippingCost));
+                  }
+                }}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem 1rem',
+                  border: '2px solid rgba(157, 186, 145, 0.3)',
+                  borderRadius: '10px',
+                  fontSize: '0.95rem',
+                  background: '#FFFFFF',
+                  color: '#354B4A',
+                  transition: 'all 0.3s ease'
+                }}
+                className="form-input"
+                min="0"
+                placeholder="0.00"
+              />
+            </div>
+            
+            <div style={{
+              background: 'rgba(157, 186, 145, 0.1)',
+              borderRadius: '12px',
+              padding: '1rem',
+              marginTop: '1.25rem'
+            }}>
+              <p style={{
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                marginBottom: '0.75rem',
+                color: '#354B4A'
+              }}>
+                Price Calculation:
               </p>
-              <p className="text-xs text-gray-600">
-                Margin: {customMargin}% = 
-                LKR {(product.adminPrice * pricingSettings.global.currencyConversion * customMargin / 100).toFixed(2)}
-              </p>
-              <p className="text-xs text-gray-600">
-                Shipping: LKR {pricingSettings.global.shippingCost.toFixed(2)}
-              </p>
-              <p className="text-sm font-semibold mt-2">
-                Final Price: LKR {customPrice.toFixed(2)}
-              </p>
+              <div style={{ fontSize: '0.875rem', color: '#354B4A' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                  <span>Base (£{product.adminPrice} × {pricingSettings.global.currencyConversion}):</span>
+                  <span style={{ fontWeight: '500' }}>LKR {(product.adminPrice * pricingSettings.global.currencyConversion).toFixed(2)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                  <span>Margin ({customMargin}%):</span>
+                  <span style={{ fontWeight: '500' }}>LKR {(product.adminPrice * pricingSettings.global.currencyConversion * customMargin / 100).toFixed(2)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                  <span>Shipping Fee:</span>
+                  <span style={{ fontWeight: '500' }}>LKR {customShippingCost.toFixed(2)}</span>
+                </div>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  paddingTop: '0.75rem',
+                  borderTop: '1px solid rgba(129, 152, 120, 0.3)',
+                  fontWeight: '700',
+                  fontSize: '1rem'
+                }}>
+                  <span>Final Price:</span>
+                  <span style={{ color: '#819878' }}>LKR {customPrice.toFixed(2)}</span>
+                </div>
+              </div>
             </div>
           </div>
           
-          <div className="flex justify-end space-x-3 mt-6">
+          <div style={{
+            display: 'flex',
+            justifyContent: 'flex-end',
+            gap: '0.75rem',
+            marginTop: '2rem'
+          }}>
             <button
               onClick={onClose}
-              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+              style={{
+                padding: '0.875rem 1.5rem',
+                border: '2px solid rgba(157, 186, 145, 0.3)',
+                borderRadius: '10px',
+                fontSize: '1rem',
+                fontWeight: '600',
+                color: '#819878',
+                background: '#FFFFFF',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = 'rgba(157, 186, 145, 0.1)';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = '#FFFFFF';
+              }}
             >
               Cancel
             </button>
             <button
               onClick={handleSave}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+              style={{
+                padding: '0.875rem 1.5rem',
+                background: '#354F52',
+                color: '#FFFFFF',
+                border: 'none',
+                borderRadius: '10px',
+                fontSize: '1rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease',
+                boxShadow: '0 4px 12px rgba(53, 79, 82, 0.25)'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.background = '#2a3e41';
+                e.target.style.transform = 'translateY(-1px)';
+                e.target.style.boxShadow = '0 6px 16px rgba(53, 79, 82, 0.35)';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.background = '#354F52';
+                e.target.style.transform = 'translateY(0)';
+                e.target.style.boxShadow = '0 4px 12px rgba(53, 79, 82, 0.25)';
+              }}
             >
               Save Price
             </button>
           </div>
         </div>
-      </div>
+        
+        {/* Add CSS animations */}
+        <style>{`
+          @keyframes fadeIn {
+            from {
+              opacity: 0;
+            }
+            to {
+              opacity: 1;
+            }
+          }
+          
+          @keyframes slideIn {
+            from {
+              opacity: 0;
+              transform: translate(-50%, -48%);
+            }
+            to {
+              opacity: 1;
+              transform: translate(-50%, -50%);
+            }
+          }
+          
+          .modal-close:hover {
+            background: rgba(146, 162, 148, 0.1);
+            color: #354B4A;
+          }
+          
+          .form-input:focus {
+            outline: none;
+            border-color: #9DBA91;
+            box-shadow: 0 0 0 3px rgba(157, 186, 145, 0.1);
+          }
+        `}</style>
+      </>
     );
   };
 
@@ -314,27 +635,72 @@ const SellerProductPanelPage = () => {
     const selectedProductsList = products.filter(p => selectedForBulk.has(p.id));
     const categoriesList = [...new Set(selectedProductsList.map(p => p.category))];
     
-    const handleBulkUpdate = () => {
-      if (bulkPricingMethod === 'adjust') {
-        if (bulkMarginAdjustment !== 0) {
-          bulkUpdatePricing(Array.from(selectedForBulk), bulkMarginAdjustment);
+    // Local state to prevent input blinking
+    const [localShippingFee, setLocalShippingFee] = React.useState(bulkShippingFee.toString());
+    
+    // Sync local state when bulkShippingFee changes externally
+    React.useEffect(() => {
+      setLocalShippingFee(bulkShippingFee.toString());
+    }, [bulkShippingFee]);
+    
+    const handleBulkUpdate = async () => {
+      try {
+        const selectedProductIds = Array.from(selectedForBulk);
+        
+        // If we have shipping fee, we need to handle each product individually with custom pricing
+        if (bulkShippingFee > 0) {
+          // Get current products to calculate new prices
+          const selectedProductsList = products.filter(p => selectedForBulk.has(p.id));
+          
+          for (const product of selectedProductsList) {
+            // Calculate new margin
+            const currentMargin = product.customMargin || 
+              pricingSettings.categories[product.category]?.margin || 
+              pricingSettings.global.defaultMargin;
+            
+            const newMargin = bulkPricingMethod === 'adjust' 
+              ? currentMargin + bulkMarginAdjustment 
+              : bulkMarginSet;
+            
+            // Calculate base price with new margin (without default shipping cost)
+            const converted = product.adminPrice * pricingSettings.global.currencyConversion;
+            const withMargin = converted * (1 + newMargin / 100);
+            
+            // Add custom shipping fee to get final custom price
+            const finalPriceWithShipping = withMargin + bulkShippingFee;
+            
+            // Update product with custom price (this will override margin calculation)
+            await updateProductPricing(product.id, null, finalPriceWithShipping, bulkShippingFee);
+            
+            // Temporarily store shipping fee in localStorage until backend supports it
+            const shippingFeeData = JSON.parse(localStorage.getItem('customShippingFees') || '{}');
+            shippingFeeData[product.id] = bulkShippingFee;
+            localStorage.setItem('customShippingFees', JSON.stringify(shippingFeeData));
+          }
+        } else {
+          // No shipping fee, use normal bulk operations
+          if (bulkPricingMethod === 'adjust') {
+            if (bulkMarginAdjustment !== 0) {
+              await bulkUpdatePricing(selectedProductIds, bulkMarginAdjustment);
+            }
+          } else if (bulkPricingMethod === 'set') {
+            // Set all selected products to the same margin
+            await bulkUpdatePricing(selectedProductIds, undefined, bulkMarginSet);
+          }
         }
-      } else if (bulkPricingMethod === 'set') {
-        // Set all selected products to the same margin
-        selectedProductsList.forEach(product => {
-          updateProductPricing(product.id, bulkMarginSet, null);
-        });
-      }
-      
-      // Refresh products after update
-      setTimeout(async () => {
+        
+        // Refresh products after update
         const updatedProducts = await getProductsWithPricing();
         setProducts(updatedProducts);
         setShowBulkPricingModal(false);
         setSelectedForBulk(new Set());
         setBulkMarginAdjustment(0);
         setBulkMarginSet(20);
-      }, 100);
+        setBulkShippingFee(0);
+      } catch (error) {
+        console.error('Error during bulk update:', error);
+        alert('Failed to update product prices. Please try again.');
+      }
     };
 
     return (
@@ -466,29 +832,80 @@ const SellerProductPanelPage = () => {
               </div>
             )}
 
+            {/* Shipping Fee Section */}
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Shipping Fee (LKR)
+              </label>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="number"
+                  value={localShippingFee}
+                  onChange={(e) => {
+                    setLocalShippingFee(e.target.value);
+                  }}
+                  onBlur={(e) => {
+                    const numValue = parseFloat(e.target.value) || 0;
+                    setBulkShippingFee(numValue);
+                  }}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      const numValue = parseFloat(e.target.value) || 0;
+                      setBulkShippingFee(numValue);
+                    }
+                  }}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-center"
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                />
+                <span className="text-sm">LKR</span>
+              </div>
+              <p className="text-xs text-gray-600 mt-1">
+                Additional shipping cost to add to all selected products
+              </p>
+            </div>
+
             {/* Preview Section */}
             <div className="border-t pt-4">
               <h4 className="text-sm font-medium mb-2">Preview (First 3 products)</h4>
               <div className="space-y-2 max-h-40 overflow-y-auto">
-                {selectedProductsList.slice(0, 3).map(product => {
-                  const currentMargin = product.customMargin || 
-                    pricingSettings.categories[product.category]?.margin || 
-                    pricingSettings.global.defaultMargin;
-                  const newMargin = bulkPricingMethod === 'adjust' 
-                    ? currentMargin + bulkMarginAdjustment 
-                    : bulkMarginSet;
-                  const newPrice = calculateSellerPrice(product.adminPrice, product.category, newMargin);
-                  
-                  return (
-                    <div key={product.id} className="text-xs bg-gray-50 p-2 rounded">
-                      <p className="font-medium">{product.name}</p>
-                      <div className="flex justify-between mt-1">
-                        <span>Current: {currentMargin}% → LKR {product.sellerPrice.toFixed(2)}</span>
-                        <span className="text-green-600">New: {newMargin}% → LKR {newPrice.toFixed(2)}</span>
+                {React.useMemo(() => {
+                  return selectedProductsList.slice(0, 3).map(product => {
+                    const currentMargin = product.customMargin || 
+                      pricingSettings.categories[product.category]?.margin || 
+                      pricingSettings.global.defaultMargin;
+                    const newMargin = bulkPricingMethod === 'adjust' 
+                      ? currentMargin + bulkMarginAdjustment 
+                      : bulkMarginSet;
+                    // Calculate base price with new margin (without default shipping cost)
+                    const converted = product.adminPrice * pricingSettings.global.currencyConversion;
+                    const baseNewPrice = converted * (1 + newMargin / 100);
+                    const newPriceWithShipping = baseNewPrice + bulkShippingFee;
+                    
+                    return (
+                      <div key={product.id} className="text-xs bg-gray-50 p-2 rounded">
+                        <p className="font-medium">{product.name}</p>
+                        <div className="space-y-1">
+                          <div className="flex justify-between">
+                            <span>Current: {currentMargin}% → LKR {product.sellerPrice.toFixed(2)}</span>
+                            <span className="text-green-600">New: {newMargin}% → LKR {baseNewPrice.toFixed(2)}</span>
+                          </div>
+                          {bulkShippingFee > 0 && (
+                            <div className="flex justify-between text-blue-600">
+                              <span>+ Shipping:</span>
+                              <span>LKR {bulkShippingFee.toFixed(2)}</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between font-semibold text-green-700 border-t pt-1">
+                            <span>Final Price:</span>
+                            <span>LKR {newPriceWithShipping.toFixed(2)}</span>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  });
+                }, [selectedProductsList, bulkPricingMethod, bulkMarginAdjustment, bulkMarginSet, bulkShippingFee, pricingSettings])}
                 {selectedProductsList.length > 3 && (
                   <p className="text-xs text-gray-500 text-center">
                     ... and {selectedProductsList.length - 3} more products
@@ -503,6 +920,7 @@ const SellerProductPanelPage = () => {
               onClick={() => {
                 setShowBulkPricingModal(false);
                 setBulkMarginAdjustment(0);
+                setBulkShippingFee(0);
               }}
               className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
             >
@@ -521,10 +939,77 @@ const SellerProductPanelPage = () => {
     );
   };
 
-  const handleSaveCustomPrice = async (productId, customMargin, customPrice) => {
-    await updateProductPricing(productId, customMargin, customPrice);
-    const updatedProducts = await getProductsWithPricing();
-    setProducts(updatedProducts);
+  const handleSaveCustomPrice = async (productId, customMargin, customPrice, customShippingCost) => {
+    try {
+      // Find the product to check if it's already selected
+      const product = products.find(p => p.id === productId);
+      
+      if (!product.isSelected) {
+        // For unselected products, we need to select them first with pricing
+        await apiService.selectProduct(
+          productId,
+          customMargin || undefined,
+          customPrice || undefined,
+          true, // isSelected = true
+          customShippingCost || undefined
+        );
+      } else {
+        // For already selected products, just update the pricing
+        await updateProductPricing(productId, customMargin, customPrice, customShippingCost);
+      }
+      
+      // Refresh the products list
+      const updatedProducts = await getProductsWithPricing();
+      setProducts(updatedProducts);
+    } catch (error) {
+      console.error('Error saving custom price:', error);
+    }
+  };
+
+  const handleOrderModalClose = () => {
+    setShowOrderModal(false);
+    setOrderStep(1);
+    setOrderItems({});
+    setSelectedForBulk(new Set());
+    setOrderForm({
+      customerName: '',
+      customerAddress: '',
+      customerPhone: '',
+      customerEmail: '',
+      notes: ''
+    });
+  };
+  
+  // Product Detail Modal Handlers
+  const handleViewProduct = (product) => {
+    const productIndex = filteredAndSortedProducts.findIndex(p => p.id === product.id);
+    setSelectedProduct(product);
+    setSelectedProductIndex(productIndex);
+    setShowProductModal(true);
+  };
+  
+  const handleCloseProductModal = () => {
+    setShowProductModal(false);
+    setSelectedProduct(null);
+    setSelectedProductIndex(0);
+  };
+  
+  const handleNextProduct = () => {
+    if (selectedProductIndex < filteredAndSortedProducts.length - 1) {
+      const nextIndex = selectedProductIndex + 1;
+      const nextProduct = filteredAndSortedProducts[nextIndex];
+      setSelectedProduct(nextProduct);
+      setSelectedProductIndex(nextIndex);
+    }
+  };
+  
+  const handlePrevProduct = () => {
+    if (selectedProductIndex > 0) {
+      const prevIndex = selectedProductIndex - 1;
+      const prevProduct = filteredAndSortedProducts[prevIndex];
+      setSelectedProduct(prevProduct);
+      setSelectedProductIndex(prevIndex);
+    }
   };
 
   if (loading || productsLoading) {
@@ -551,6 +1036,23 @@ const SellerProductPanelPage = () => {
             <span className="text-sm text-gray-600">
               Products in Store: {selectedCount} | Selected for Export: {selectedForBulk.size}
             </span>
+            <button
+              onClick={async () => {
+                setProductsLoading(true);
+                try {
+                  const refreshedProducts = await getProductsWithPricing();
+                  setProducts(refreshedProducts);
+                } catch (error) {
+                  console.error('Error refreshing products:', error);
+                } finally {
+                  setProductsLoading(false);
+                }
+              }}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              disabled={productsLoading}
+            >
+              {productsLoading ? '🔄 Refreshing...' : '🔄 Refresh Prices'}
+            </button>
             <button
               onClick={handleExportSelected}
               className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
@@ -611,10 +1113,10 @@ const SellerProductPanelPage = () => {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="all">All Prices</option>
-                <option value="0-50">$0 - $50</option>
-                <option value="50-100">$50 - $100</option>
-                <option value="100-200">$100 - $200</option>
-                <option value="200">$200+</option>
+                <option value="0-50">£0 - £50</option>
+                <option value="50-100">£50 - £100</option>
+                <option value="100-200">£100 - £200</option>
+                <option value="200">£200+</option>
               </select>
             </div>
 
@@ -684,12 +1186,29 @@ const SellerProductPanelPage = () => {
                 Bulk Edit Pricing
               </button>
               {selectedForBulk.size > 0 && (
-                <button
-                  onClick={() => setSelectedForBulk(new Set())}
-                  className="px-3 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 text-sm"
-                >
-                  Clear Selection
-                </button>
+                <>
+                  <button
+                    onClick={() => {
+                      // Initialize order items with quantity 1 for each selected product
+                      const initialItems = {};
+                      selectedForBulk.forEach(productId => {
+                        initialItems[productId] = 1;
+                      });
+                      setOrderItems(initialItems);
+                      setOrderStep(1);
+                      setShowOrderModal(true);
+                    }}
+                    className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
+                  >
+                    Order Now ({selectedForBulk.size})
+                  </button>
+                  <button
+                    onClick={() => setSelectedForBulk(new Set())}
+                    className="px-3 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 text-sm"
+                  >
+                    Clear Selection
+                  </button>
+                </>
               )}
             </div>
           </div>
@@ -706,6 +1225,7 @@ const SellerProductPanelPage = () => {
               onEditPrice={setEditingProduct}
               onBulkSelect={handleBulkSelect}
               isSelected={selectedForBulk.has(product.id)}
+              onViewDetails={handleViewProduct}
             />
           ))}
         </div>
@@ -791,8 +1311,35 @@ const SellerProductPanelPage = () => {
 
     {/* Bulk Pricing Modal */}
     {showBulkPricingModal && <BulkPricingModal />}
+    
+    {/* Order Modal */}
+    <OrderModal
+      isVisible={showOrderModal}
+      onClose={handleOrderModalClose}
+      products={products}
+      selectedForBulk={selectedForBulk}
+      orderItems={orderItems}
+      setOrderItems={setOrderItems}
+      orderStep={orderStep}
+      setOrderStep={setOrderStep}
+      orderForm={orderForm}
+      setOrderForm={setOrderForm}
+      apiService={apiService}
+    />
+    
+    {/* Product Detail Modal */}
+    <ProductDetailModal
+      isVisible={showProductModal}
+      onClose={handleCloseProductModal}
+      product={selectedProduct}
+      allProducts={filteredAndSortedProducts}
+      currentIndex={selectedProductIndex}
+      onNextProduct={handleNextProduct}
+      onPrevProduct={handlePrevProduct}
+    />
     </>
   );
+
 };
 
 export default SellerProductPanelPage;

@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run dev:*)",
+      "Bash(grep:*)",
+      "Bash(rm:*)",
+      "Bash(mkdir:*)",
+      "Bash(npm install)",
+      "Bash(npm run init-db:*)",
+      "Bash(npm start)",
+      "Bash(curl:*)",
+      "Bash(lsof:*)",
+      "Bash(pkill:*)",
+      "Bash(sqlite3:*)",
+      "Bash(node server.js)",
+      "Bash(PORT=5001 npm start)",
+      "Bash(PORT=3000 node server.js)",
+      "Bash(node:*)",
+      "Bash(npx http-server:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run build:*)",
+      "Bash(find:*)",
+      "WebFetch(domain:localhost)",
+      "Bash(npm run lint)",
+      "Bash(npm run test:run:*)",
+      "Bash(npm test)"
+    ],
+    "deny": []
+  },
+  "enableAllProjectMcpServers": false
+}

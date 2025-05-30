@@ -179,28 +179,45 @@ router.delete('/rules/:id', authenticate, authorize('super_admin'), async (req, 
   }
 });
 
-// Get global pricing settings
-router.get('/global', authenticate, authorize('super_admin'), async (req, res) => {
+// Get global pricing settings (accessible to all authenticated users)
+router.get('/global', authenticate, async (req, res) => {
   try {
     const db = getDatabase();
-    const query = 'SELECT * FROM global_settings WHERE key LIKE "pricing_%"';
+    const query = 'SELECT * FROM global_settings WHERE key IN ("currencyConversion", "shippingCost", "defaultMargin")';
     
     db.all(query, [], (err, rows) => {
       if (err) {
         console.error('Error fetching global settings:', err);
-        return res.status(500).json({ message: 'Failed to fetch global settings' });
+        return res.status(500).json({ 
+          success: false,
+          message: 'Failed to fetch global settings' 
+        });
       }
       
-      const settings = {};
+      const settings = {
+        currencyConversion: 182,
+        shippingCost: 500,
+        defaultMargin: 20
+      };
+      
       rows.forEach(row => {
-        settings[row.key] = row.value;
+        const value = parseFloat(row.value);
+        if (!isNaN(value)) {
+          settings[row.key] = value;
+        }
       });
       
-      res.json(settings);
+      res.json({
+        success: true,
+        settings
+      });
     });
   } catch (error) {
     console.error('Error fetching global settings:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(500).json({ 
+      success: false,
+      message: 'Internal server error' 
+    });
   }
 });
 

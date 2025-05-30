@@ -1,6 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import DarkModeToggle from '../common/DarkModeToggle.jsx';
+import { LogOut } from 'lucide-react';
 
 const Navbar = ({ darkMode, setDarkMode }) => {
   const { userRole, currentUser, logout } = useAuth();
@@ -26,7 +27,8 @@ const Navbar = ({ darkMode, setDarkMode }) => {
           {userRole === 'seller' && <Link to="/seller/dashboard" className="hover:text-indigo-500">Seller Dashboard</Link>}
           {userRole === 'super_admin' && <Link to="/admin/dashboard" className="hover:text-indigo-500">Admin Dashboard</Link>}
           {(userRole === 'seller' || userRole === 'super_admin') && (
-            <button type="button" onClick={handleLogout} className={`px-3 py-1 rounded text-sm ${darkMode ? 'bg-red-600 hover:bg-red-500' : 'bg-red-500 text-white hover:bg-red-600'}`}>
+            <button type="button" onClick={handleLogout} className={`px-3 py-1 rounded text-sm flex items-center gap-2 ${darkMode ? 'bg-red-600 hover:bg-red-500' : 'bg-red-500 text-white hover:bg-red-600'}`}>
+              <LogOut size={16} />
               Logout
             </button>
           )}

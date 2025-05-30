@@ -1,23 +1,33 @@
 import React, { useState, useEffect } from 'react';
 import Papa from 'papaparse';
 import apiService from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 import './CsvImporter.css';
 import logo from '../assets/logo animation_1.svg';
 
-// Expected headers for our product import
-const PRODUCT_HEADERS = [
-  "ID", "Sold individually?", "Type", "SKU", "GTIN, UPC, EAN, or ISBN", "Is featured?", 
-  "Visibility in catalog", "Name", "Published", "In stock?", "Short description", 
-  "Description", "Date sale price starts", "Date sale price ends", "Sale price", 
-  "Tax status", "Tax class", "Shipping class", "Stock", "Low stock amount", 
-  "Backorders allowed?", "Allow customer reviews?", "Weight (kg)", "Length (cm)", 
-  "Width (cm)", "Height (cm)", "Purchase note", "Regular price", "Categories", 
-  "Tags", "Images", "Download limit", "Download expiry days", "Parent", 
-  "Grouped products", "Upsells", "Cross-sells", "External URL", "Button text", 
-  "Position", "Brands"
+// Expected headers for our product import - organized by priority
+const REQUIRED_HEADERS = [
+  "Name", "SKU", "Categories", "Regular price", "Brand"
 ];
 
+const CORE_HEADERS = [
+  "Description", "Short description", "Images", "All image urls", "Stock"
+];
+
+const OPTIONAL_HEADERS = [
+  "ID", "Sold individually?", "Type", "GTIN, UPC, EAN, or ISBN", "Is featured?", 
+  "Visibility in catalog", "Published", "In stock?", "Date sale price starts", 
+  "Date sale price ends", "Sale price", "Tax status", "Tax class", "Shipping class", 
+  "Low stock amount", "Backorders allowed?", "Allow customer reviews?", "Weight (kg)", 
+  "Length (cm)", "Width (cm)", "Height (cm)", "Purchase note", "Tags", 
+  "Download limit", "Download expiry days", "Parent", "Grouped products", 
+  "Upsells", "Cross-sells", "External URL", "Button text", "Position"
+];
+
+const PRODUCT_HEADERS = [...REQUIRED_HEADERS, ...CORE_HEADERS, ...OPTIONAL_HEADERS];
+
 const CsvImporter = ({ onImportComplete, onClose }) => {
+  const { currentUser, userRole } = useAuth();
   const [csvData, setCsvData] = useState([]);
   const [uploadedHeaders, setUploadedHeaders] = useState([]);
   const [headerMap, setHeaderMap] = useState({});
@@ -28,6 +38,50 @@ const CsvImporter = ({ onImportComplete, onClose }) => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [editingCell, setEditingCell] = useState(null);
   const [importResults, setImportResults] = useState(null);
+  const [categories, setCategories] = useState([]);
+  const [categoryMappings, setCategoryMappings] = useState({});
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [hierarchicalCategories, setHierarchicalCategories] = useState([]);
+
+  // Fetch categories for dropdown
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const [flatResponse, hierarchyResponse] = await Promise.all([
+          apiService.getActiveCategories(),
+          apiService.getCategoriesHierarchy(false) // Only active categories
+        ]);
+        
+        if (flatResponse.success) {
+          setCategories(flatResponse.categories);
+        }
+        
+        if (hierarchyResponse.success) {
+          // Flatten hierarchy for dropdown while preserving levels
+          const flattened = flattenHierarchy(hierarchyResponse.categories);
+          setHierarchicalCategories(flattened);
+        }
+      } catch (error) {
+        console.error('Error fetching categories:', error);
+      }
+    };
+    fetchCategories();
+  }, []);
+
+  // Helper function to flatten hierarchy with level information
+  const flattenHierarchy = (categories, level = 0) => {
+    let flattened = [];
+    
+    categories.forEach(category => {
+      flattened.push({ ...category, level });
+      
+      if (category.children && category.children.length > 0) {
+        flattened = flattened.concat(flattenHierarchy(category.children, level + 1));
+      }
+    });
+    
+    return flattened;
+  };
 
   // Effect to create initial header mapping when new headers are uploaded
   useEffect(() => {
@@ -77,7 +131,8 @@ const CsvImporter = ({ onImportComplete, onClose }) => {
             'price': 'Regular price', 'regular_price': 'Regular price', 'cost': 'Regular price',
             'category': 'Categories', 'categories': 'Categories', 'cat': 'Categories',
             'tags': 'Tags', 'product_tags': 'Tags',
-            'image': 'Images', 'images': 'Images', 'image_url': 'Images',
+            'image': 'Images', 'images': 'Images', 'image_url': 'Images', 'thumbnail': 'Images',
+            'all_images': 'All image urls', 'all_image_urls': 'All image urls', 'image_urls': 'All image urls',
             'download_limit': 'Download limit', 'downloads': 'Download limit',
             'download_expiry': 'Download expiry days', 'expiry': 'Download expiry days',
             'parent': 'Parent', 'parent_id': 'Parent',
@@ -87,7 +142,7 @@ const CsvImporter = ({ onImportComplete, onClose }) => {
             'external_url': 'External URL', 'url': 'External URL',
             'button_text': 'Button text', 'btn_text': 'Button text',
             'position': 'Position', 'menu_order': 'Position',
-            'brand': 'Brands', 'brands': 'Brands', 'manufacturer': 'Brands'
+            'brand': 'Brand', 'brands': 'Brand', 'manufacturer': 'Brand', 'brand_name': 'Brand', 'product_brand': 'Brand'
           };
           foundProductHeader = mappings[normalizedHeader] || "";
         }
@@ -270,11 +325,26 @@ const CsvImporter = ({ onImportComplete, onClose }) => {
       return;
     }
 
+    // Check authentication before proceeding
+    const token = localStorage.getItem('auth_token');
+    if (!token || !currentUser) {
+      alert("You are not logged in. Please log in as an admin to import products.");
+      return;
+    }
+
+    // Check if user has admin privileges
+    if (userRole !== 'super_admin') {
+      alert("You need super admin privileges to import products. Current role: " + userRole);
+      return;
+    }
+
     // Validate that required fields are mapped
-    const requiredFields = ['SKU', 'Name', 'Categories', 'Regular price'];
-    const missingMappings = requiredFields.filter(field => 
-      !Object.values(headerMap).includes(field)
-    );
+    const missingMappings = REQUIRED_HEADERS.filter(field => {
+      if (field === 'Categories') {
+        return !selectedCategory;
+      }
+      return !Object.values(headerMap).includes(field);
+    });
 
     if (missingMappings.length > 0) {
       alert(`Please map the following required fields: ${missingMappings.join(', ')}`);
@@ -288,59 +358,40 @@ const CsvImporter = ({ onImportComplete, onClose }) => {
       const processedData = generateProcessedData();
       
       // Transform to format expected by backend
-      const products = processedData.map(row => ({
-        id: row.ID || '',
-        soldIndividually: row['Sold individually?'] === 'true',
-        type: row.Type || 'simple',
-        sku: row.SKU,
-        gtin: row['GTIN, UPC, EAN, or ISBN'] || '',
-        isFeatured: row['Is featured?'] === 'true',
-        catalogVisibility: row['Visibility in catalog'] || 'visible',
-        name: row.Name,
-        published: row.Published === 'true',
-        inStock: row['In stock?'] === 'true',
-        shortDescription: row['Short description'] || '',
-        description: row.Description || '',
-        salePriceStart: row['Date sale price starts'] || '',
-        salePriceEnd: row['Date sale price ends'] || '',
-        salePrice: parseFloat(row['Sale price']) || 0,
-        taxStatus: row['Tax status'] || 'taxable',
-        taxClass: row['Tax class'] || '',
-        shippingClass: row['Shipping class'] || '',
-        stock: parseInt(row.Stock) || 0,
-        lowStockAmount: parseInt(row['Low stock amount']) || 0,
-        backordersAllowed: row['Backorders allowed?'] === 'true',
-        reviewsAllowed: row['Allow customer reviews?'] === 'true',
-        weight: parseFloat(row['Weight (kg)']) || 0,
-        length: parseFloat(row['Length (cm)']) || 0,
-        width: parseFloat(row['Width (cm)']) || 0,
-        height: parseFloat(row['Height (cm)']) || 0,
-        purchaseNote: row['Purchase note'] || '',
-        regularPrice: parseFloat(row['Regular price']) || 0,
-        categories: row.Categories || '',
-        tags: row.Tags || '',
-        images: row.Images || '',
-        downloadLimit: parseInt(row['Download limit']) || 0,
-        downloadExpiry: parseInt(row['Download expiry days']) || 0,
-        parent: row.Parent || '',
-        groupedProducts: row['Grouped products'] || '',
-        upsells: row.Upsells || '',
-        crossSells: row['Cross-sells'] || '',
-        externalUrl: row['External URL'] || '',
-        buttonText: row['Button text'] || '',
-        position: parseInt(row.Position) || 0,
-        brands: row.Brands || ''
-      }));
+      const products = processedData.map(row => {
+        const basePrice = parseFloat(row['Regular price']) || 0;
+        return {
+          sku: row.SKU,
+          name: row.Name,
+          description: row.Description || '',
+          category: selectedCategory,
+          brand: row.Brand || '',
+          basePrice: basePrice, // Store the original CSV price as base price
+          adminPrice: basePrice, // Admin price will be calculated on backend
+          stock: parseInt(row.Stock) || 0,
+          weight: parseFloat(row['Weight (kg)']) || 0,
+          dimensions: `${row['Length (cm)'] || 0}x${row['Width (cm)'] || 0}x${row['Height (cm)'] || 0}cm`,
+          image: row.Images || '',
+          published: false
+        };
+      });
 
       // Filter out invalid products (check for required fields)
       const validProducts = products.filter(product => 
-        product.sku && product.name && product.categories && product.regularPrice > 0
+        product.sku && product.name && product.category && product.adminPrice > 0 && product.brand
       );
 
       if (validProducts.length === 0) {
         throw new Error('No valid products found after processing');
       }
 
+      console.log('Attempting to import products:', validProducts.length);
+      console.log('Sample product:', validProducts[0]);
+      console.log('Current auth token:', localStorage.getItem('auth_token'));
+      console.log('API service token:', apiService.token);
+      console.log('Current user:', currentUser);
+      console.log('User role:', userRole);
+      
       const result = await apiService.bulkCreateProducts(validProducts);
       
       setImportResults({
@@ -360,10 +411,28 @@ const CsvImporter = ({ onImportComplete, onClose }) => {
 
     } catch (err) {
       console.error('Import error:', err);
+      console.error('Error details:', err.response);
+      console.error('Full error object:', JSON.stringify(err, null, 2));
+      
+      // Check if it's an authentication error
+      const errorMessage = err.message || 'Failed to import products';
+      let detailedMessage = errorMessage;
+      
+      if (errorMessage.includes('Invalid token') || errorMessage.includes('401')) {
+        detailedMessage = 'Authentication failed. Please make sure you are logged in as an admin.';
+      } else if (errorMessage.includes('403')) {
+        detailedMessage = 'Access denied. You need super admin privileges to import products.';
+      }
+      
       setImportResults({
         success: false,
-        message: err.message,
-        summary: { errorCount: 1 }
+        message: detailedMessage,
+        summary: { 
+          errorCount: 1,
+          totalRows: csvData.length,
+          skippedCount: 0,
+          successCount: 0
+        }
       });
     } finally {
       setProcessing(false);
@@ -517,62 +586,204 @@ const CsvImporter = ({ onImportComplete, onClose }) => {
                 <p style={{ marginBottom: '1rem', fontSize: '0.875rem', color: 'var(--secondary)' }}>
                   Match your CSV column headers to the required product fields.
                   <br />
-                  <span style={{ color: 'var(--error)', fontWeight: '600' }}>* Required fields: SKU, Name, Categories, Regular price</span>
+                  <span style={{ color: 'var(--error)', fontWeight: '600' }}>* Required fields: Name, SKU, Categories, Regular price, Brand</span>
+                  <br />
+                  <span style={{ color: 'var(--primary)', fontWeight: '600' }}>⭐ Core fields: Description, Short description, Images, All image urls, Stock</span>
+                  <br />
+                  <span style={{ color: 'var(--warning)', fontWeight: '600' }}>📝 Note: Imported products will be unpublished by default for admin review</span>
                 </p>
+                
+
                 <div style={{ overflowX: 'auto' }}>
                   <table className="mapping-table">
                     <thead>
                       <tr>
+                        <th>Product Field</th>
                         <th>Your CSV Header</th>
-                        <th>Map to Product Field</th>
-                        <th>Suggestions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {uploadedHeaders.map((uploaded) => {
-                        const suggestions = getSmartSuggestions(uploaded);
-                        const isRequired = ['SKU', 'Name', 'Categories', 'Regular price'].includes(headerMap[uploaded]);
+                      {/* Required Fields */}
+                      {REQUIRED_HEADERS.map((productField) => {
+                        const mappedCsvHeader = Object.keys(headerMap).find(key => headerMap[key] === productField);
+                        const fieldDescriptions = {
+                          'Name': 'Product title (can map through CSV)',
+                          'SKU': 'Product identifier (can map through CSV)',
+                          'Categories': 'Must be selected from available database categories',
+                          'Regular price': 'Base product price (can map through CSV)',
+                          'Brand': 'Product brand name (can map through CSV)'
+                        };
+                        
                         return (
-                          <tr key={uploaded}>
-                            <td style={{ fontWeight: '500' }}>{uploaded}</td>
+                          <tr key={productField} style={{ backgroundColor: 'var(--error-light)' }}>
+                            <td style={{ fontWeight: '600' }}>
+                              <div style={{ color: 'var(--error)', marginBottom: '0.25rem' }}>
+                                🔥 {productField} *
+                              </div>
+                              <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', fontWeight: 'normal' }}>
+                                {fieldDescriptions[productField]}
+                              </div>
+                            </td>
+                            <td>
+                              {productField === 'Categories' ? (
+                                <>
+                                  <div style={{ position: 'relative' }}>
+                                    <select
+                                      value={selectedCategory}
+                                      onChange={(e) => setSelectedCategory(e.target.value)}
+                                      className="mapping-select required"
+                                    >
+                                      <option value="">-- Select Database Category --</option>
+                                      {hierarchicalCategories.map((category) => {
+                                        const indent = '\u00A0\u00A0\u00A0\u00A0'.repeat(category.level);
+                                        const prefix = category.level > 0 ? '└─ ' : '';
+                                        return (
+                                          <option 
+                                            key={category.id} 
+                                            value={category.name}
+                                          >
+                                            {indent}{prefix}{category.icon} {category.name}
+                                          </option>
+                                        );
+                                      })}
+                                    </select>
+                                    {selectedCategory && (
+                                      <div style={{
+                                        position: 'absolute',
+                                        top: '50%',
+                                        right: '40px',
+                                        transform: 'translateY(-50%)',
+                                        pointerEvents: 'none',
+                                        fontSize: '0.875rem',
+                                        color: 'var(--success)'
+                                      }}>
+                                        ✓
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                                    {categories.length} categories available in database
+                                    {selectedCategory && (() => {
+                                      const selected = hierarchicalCategories.find(c => c.name === selectedCategory);
+                                      if (selected && selected.level > 0) {
+                                        // Find parent category
+                                        const parentIndex = hierarchicalCategories.findIndex(c => c.name === selectedCategory);
+                                        let parent = null;
+                                        for (let i = parentIndex - 1; i >= 0; i--) {
+                                          if (hierarchicalCategories[i].level < selected.level) {
+                                            parent = hierarchicalCategories[i];
+                                            break;
+                                          }
+                                        }
+                                        if (parent) {
+                                          return (
+                                            <div style={{ marginTop: '4px', color: 'var(--primary)' }}>
+                                              Selected: {parent.icon} {parent.name} → {selected.icon} {selected.name}
+                                            </div>
+                                          );
+                                        }
+                                      }
+                                      return null;
+                                    })()}
+                                  </div>
+                                </>
+                              ) : (
+                                <select
+                                  value={mappedCsvHeader || ""}
+                                  onChange={(e) => {
+                                    // Clear previous mapping
+                                    if (mappedCsvHeader) {
+                                      handleMappingChange(mappedCsvHeader, "");
+                                    }
+                                    // Set new mapping
+                                    if (e.target.value) {
+                                      handleMappingChange(e.target.value, productField);
+                                    }
+                                  }}
+                                  className="mapping-select required"
+                                >
+                                  <option value="">-- Select CSV Header --</option>
+                                  {uploadedHeaders.map((header) => (
+                                    <option key={header} value={header}>
+                                      {header}
+                                    </option>
+                                  ))}
+                                </select>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      
+                      {/* Core Fields */}
+                      {CORE_HEADERS.map((productField) => {
+                        const mappedCsvHeader = Object.keys(headerMap).find(key => headerMap[key] === productField);
+                        const fieldDescriptions = {
+                          'Description': 'Full product description (can map through CSV)',
+                          'Short description': 'Brief product summary (can map through CSV)',
+                          'Images': 'Product thumbnail image URL (can map through CSV)',
+                          'All image urls': 'Multiple image URLs for product gallery (can map through CSV)',
+                          'Stock': 'Product inventory quantity (can map through CSV)'
+                        };
+                        
+                        return (
+                          <tr key={productField} style={{ backgroundColor: 'var(--primary-light-rgba)' }}>
+                            <td style={{ fontWeight: '600' }}>
+                              <div style={{ color: 'var(--primary)', marginBottom: '0.25rem' }}>
+                                ⭐ {productField}
+                              </div>
+                              <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', fontWeight: 'normal' }}>
+                                {fieldDescriptions[productField]}
+                              </div>
+                            </td>
                             <td>
                               <select
-                                value={headerMap[uploaded] || ""}
-                                onChange={(e) => handleMappingChange(uploaded, e.target.value)}
-                                className={`mapping-select ${isRequired ? 'required' : ''}`}
+                                value={mappedCsvHeader || ""}
+                                onChange={(e) => {
+                                  // Clear previous mapping
+                                  if (mappedCsvHeader) {
+                                    handleMappingChange(mappedCsvHeader, "");
+                                  }
+                                  // Set new mapping
+                                  if (e.target.value) {
+                                    handleMappingChange(e.target.value, productField);
+                                  }
+                                }}
+                                className="mapping-select core"
                               >
-                                <option value="">-- Select Product Field --</option>
-                                {PRODUCT_HEADERS.map((productHeader) => (
-                                  <option key={productHeader} value={productHeader}>
-                                    {productHeader}
-                                    {['SKU', 'Name', 'Categories', 'Regular price'].includes(productHeader) ? ' *' : ''}
+                                <option value="">-- Select CSV Header --</option>
+                                {uploadedHeaders.map((header) => (
+                                  <option key={header} value={header}>
+                                    {header}
                                   </option>
                                 ))}
                               </select>
-                            </td>
-                            <td>
-                              <div className="suggestion-buttons">
-                                {suggestions.map((suggestion) => (
-                                  <button
-                                    key={suggestion}
-                                    onClick={() => handleMappingChange(uploaded, suggestion)}
-                                    className="suggestion-button"
-                                  >
-                                    {suggestion}
-                                  </button>
-                                ))}
-                                {suggestions.length === 0 && (
-                                  <span style={{ fontSize: '0.75rem', fontStyle: 'italic', color: 'var(--neutral)' }}>
-                                    No suggestions
-                                  </span>
-                                )}
-                              </div>
                             </td>
                           </tr>
                         );
                       })}
                     </tbody>
                   </table>
+                </div>
+
+                {/* Mapping Summary */}
+                <div style={{ 
+                  marginTop: '1rem', 
+                  padding: '0.75rem', 
+                  backgroundColor: 'var(--surface)', 
+                  borderRadius: 'var(--radius)',
+                  fontSize: '0.875rem' 
+                }}>
+                  <strong>Mapping Status:</strong>
+                  <span style={{ marginLeft: '0.5rem' }}>
+                    Required: {REQUIRED_HEADERS.filter(h => h === 'Categories' ? !!selectedCategory : Object.values(headerMap).includes(h)).length}/{REQUIRED_HEADERS.length}
+                  </span>
+                  <span style={{ marginLeft: '1rem' }}>
+                    Core: {CORE_HEADERS.filter(h => Object.values(headerMap).includes(h)).length}/{CORE_HEADERS.length}
+                  </span>
+                  <span style={{ marginLeft: '1rem' }}>
+                    Total Mapped: {Object.values(headerMap).filter(v => v).length}/{uploadedHeaders.length}
+                  </span>
                 </div>
               </div>
 

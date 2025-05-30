@@ -9,7 +9,7 @@ const AdminPricingSettingsPage = () => {
     defaultMargin: 25,
     defaultTax: 2,
     defaultShipping: 3,
-    currency: 'USD'
+    currency: 'GBP'
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -352,7 +352,7 @@ const AdminPricingSettingsPage = () => {
                     <strong>Admin Price = (Base Price × Admin Margin) + Admin Tax + Admin Shipping</strong>
                   </p>
                   <p className="text-sm" style={{ color: 'var(--text-light)' }}>
-                    Example: $20 × 1.25 (25%) + $2 tax + $3 shipping = $30 admin price
+                    Example: £20 × 1.25 (25%) + £2 tax + £3 shipping = £30 admin price
                   </p>
                 </div>
               </div>
@@ -380,9 +380,9 @@ const AdminPricingSettingsPage = () => {
                       <tr key={rule.id}>
                         <td className="font-semibold">{rule.category}</td>
                         <td>{rule.adminMargin}%</td>
-                        <td>${rule.adminTax.toFixed(2)}</td>
-                        <td>${rule.adminShipping.toFixed(2)}</td>
-                        <td>${rule.minimumPrice.toFixed(2)}</td>
+                        <td>£{rule.adminTax.toFixed(2)}</td>
+                        <td>£{rule.adminShipping.toFixed(2)}</td>
+                        <td>£{rule.minimumPrice.toFixed(2)}</td>
                         <td>{rule.maximumDiscount}%</td>
                         <td>
                           <span className={`badge ${
@@ -470,7 +470,7 @@ const AdminPricingSettingsPage = () => {
                     </div>
                     <div>
                       <label className="font-semibold" style={{ display: 'block', marginBottom: 'var(--space-1)', color: 'var(--text-primary)' }}>
-                        Default Admin Tax ($)
+                        Default Admin Tax (£)
                       </label>
                       <input 
                         type="number"
@@ -483,7 +483,7 @@ const AdminPricingSettingsPage = () => {
                     </div>
                     <div>
                       <label className="font-semibold" style={{ display: 'block', marginBottom: 'var(--space-1)', color: 'var(--text-primary)' }}>
-                        Default Admin Shipping ($)
+                        Default Admin Shipping (£)
                       </label>
                       <input 
                         type="number"
@@ -510,7 +510,7 @@ const AdminPricingSettingsPage = () => {
                         className="btn btn-outline"
                         style={{ width: '100%', textAlign: 'left' }}
                       >
-                        <option value="USD">USD - US Dollar</option>
+                        <option value="GBP">GBP - British Pound</option>
                         <option value="EUR">EUR - Euro</option>
                         <option value="GBP">GBP - British Pound</option>
                         <option value="CAD">CAD - Canadian Dollar</option>
@@ -543,7 +543,7 @@ const AdminPricingSettingsPage = () => {
                   <div style={{ display: 'grid', gap: 'var(--space-3)' }}>
                     <div>
                       <label className="font-semibold" style={{ display: 'block', marginBottom: 'var(--space-1)', color: 'var(--text-primary)' }}>
-                        Base Price ($)
+                        Base Price (£)
                       </label>
                       <input 
                         type="number"
@@ -595,19 +595,19 @@ const AdminPricingSettingsPage = () => {
                         <div style={{ marginBottom: 'var(--space-3)' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--space-1)' }}>
                             <span>Base Price:</span>
-                            <span className="font-semibold">${calculatorData.result.basePrice.toFixed(2)}</span>
+                            <span className="font-semibold">£{calculatorData.result.basePrice.toFixed(2)}</span>
                           </div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--space-1)' }}>
                             <span>Admin Margin ({calculatorData.result.adminMargin}%):</span>
-                            <span>${calculatorData.result.basePrice.toFixed(2)} × {(1 + calculatorData.result.adminMargin / 100).toFixed(2)} = ${(calculatorData.result.basePrice * (1 + calculatorData.result.adminMargin / 100)).toFixed(2)}</span>
+                            <span>£{calculatorData.result.basePrice.toFixed(2)} × {(1 + calculatorData.result.adminMargin / 100).toFixed(2)} = £{(calculatorData.result.basePrice * (1 + calculatorData.result.adminMargin / 100)).toFixed(2)}</span>
                           </div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--space-1)' }}>
                             <span>Admin Tax:</span>
-                            <span>+ ${calculatorData.result.adminTax.toFixed(2)}</span>
+                            <span>+ £{calculatorData.result.adminTax.toFixed(2)}</span>
                           </div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--space-1)' }}>
                             <span>Admin Shipping:</span>
-                            <span>+ ${calculatorData.result.adminShipping.toFixed(2)}</span>
+                            <span>+ £{calculatorData.result.adminShipping.toFixed(2)}</span>
                           </div>
                           <div style={{ 
                             borderTop: '1px solid var(--border-light)', 
@@ -616,7 +616,7 @@ const AdminPricingSettingsPage = () => {
                             justifyContent: 'space-between' 
                           }}>
                             <span className="font-semibold">Admin Price:</span>
-                            <span className="font-semibold" style={{ color: 'var(--primary-dark)' }}>${calculatorData.result.adminPrice.toFixed(2)}</span>
+                            <span className="font-semibold" style={{ color: 'var(--primary-dark)' }}>£{calculatorData.result.adminPrice.toFixed(2)}</span>
                           </div>
                         </div>
                         <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
@@ -628,19 +628,19 @@ const AdminPricingSettingsPage = () => {
                         <div style={{ marginBottom: 'var(--space-3)' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--space-1)' }}>
                             <span>Base Price:</span>
-                            <span className="font-semibold">$20.00</span>
+                            <span className="font-semibold">£20.00</span>
                           </div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--space-1)' }}>
                             <span>Admin Margin (25%):</span>
-                            <span>$20.00 × 1.25 = $25.00</span>
+                            <span>£20.00 × 1.25 = £25.00</span>
                           </div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--space-1)' }}>
                             <span>Admin Tax:</span>
-                            <span>+ $2.00</span>
+                            <span>+ £2.00</span>
                           </div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--space-1)' }}>
                             <span>Admin Shipping:</span>
-                            <span>+ $3.00</span>
+                            <span>+ £3.00</span>
                           </div>
                           <div style={{ 
                             borderTop: '1px solid var(--border-light)', 
@@ -649,7 +649,7 @@ const AdminPricingSettingsPage = () => {
                             justifyContent: 'space-between' 
                           }}>
                             <span className="font-semibold">Admin Price:</span>
-                            <span className="font-semibold" style={{ color: 'var(--primary-dark)' }}>$30.00</span>
+                            <span className="font-semibold" style={{ color: 'var(--primary-dark)' }}>£30.00</span>
                           </div>
                         </div>
                         <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
@@ -675,7 +675,7 @@ const AdminPricingSettingsPage = () => {
                 {[
                   { date: '2024-01-15', action: 'Updated Snacks & Sweets margin from 25% to 30%', user: 'B. Madhushan' },
                   { date: '2024-01-12', action: 'Added new pricing rule for Electronics category', user: 'B. Madhushan' },
-                  { date: '2024-01-10', action: 'Changed global default shipping from $2 to $3', user: 'B. Madhushan' },
+                  { date: '2024-01-10', action: 'Changed global default shipping from £2 to £3', user: 'B. Madhushan' },
                   { date: '2024-01-08', action: 'Deactivated Fashion & Footwear bulk discounts', user: 'B. Madhushan' }
                 ].map((change, index) => (
                   <div key={index} className="activity-item">
@@ -763,7 +763,7 @@ const AdminPricingSettingsPage = () => {
                     </div>
                     <div>
                       <label className="font-semibold" style={{ display: 'block', marginBottom: 'var(--space-1)' }}>
-                        Admin Tax ($)
+                        Admin Tax (£)
                       </label>
                       <input
                         type="number"
@@ -779,7 +779,7 @@ const AdminPricingSettingsPage = () => {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
                     <div>
                       <label className="font-semibold" style={{ display: 'block', marginBottom: 'var(--space-1)' }}>
-                        Admin Shipping ($)
+                        Admin Shipping (£)
                       </label>
                       <input
                         type="number"
@@ -792,7 +792,7 @@ const AdminPricingSettingsPage = () => {
                     </div>
                     <div>
                       <label className="font-semibold" style={{ display: 'block', marginBottom: 'var(--space-1)' }}>
-                        Minimum Price ($)
+                        Minimum Price (£)
                       </label>
                       <input
                         type="number"

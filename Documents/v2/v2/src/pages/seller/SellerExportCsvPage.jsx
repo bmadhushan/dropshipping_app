@@ -20,7 +20,7 @@ const SellerExportCsvPage = () => {
     mapping: {}
   });
   const [sellerPricing, setSellerPricing] = useState({
-    currencyConversion: 1.25, // USD to AUD
+    currencyConversion: 1.25, // GBP to AUD
     margin: 15,
     shippingCost: 5.00
   });
@@ -525,7 +525,7 @@ const SellerExportCsvPage = () => {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 'var(--space-4)' }}>
               <div>
                 <label className="text-sm font-medium" style={{ display: 'block', marginBottom: 'var(--space-2)', color: 'var(--text-secondary)' }}>
-                  Currency Conversion (USD → AUD)
+                  Currency Conversion (GBP → AUD)
                 </label>
                 <input
                   type="number"
@@ -848,8 +848,8 @@ const SellerExportCsvPage = () => {
                           </span>
                         </td>
                         <td>
-                          <div className="text-sm">${product.adminPrice.toFixed(2)}</div>
-                          <div className="text-sm" style={{ color: 'var(--text-secondary)' }}>USD</div>
+                          <div className="text-sm">£{product.adminPrice.toFixed(2)}</div>
+                          <div className="text-sm" style={{ color: 'var(--text-secondary)' }}>GBP</div>
                         </td>
                         <td>
                           <div className="font-medium" style={{ color: 'var(--success)' }}>${sellerPrice.toFixed(2)}</div>

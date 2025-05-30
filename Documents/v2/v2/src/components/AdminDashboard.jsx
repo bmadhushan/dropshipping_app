@@ -171,7 +171,7 @@ const AdminDashboard = () => {
         />
         <StatCard
           title="Revenue"
-          value={`$${stats.revenue.toLocaleString()}`}
+          value={`£${stats.revenue.toLocaleString()}`}
           icon="💰"
           color="#e74c3c"
           subtitle="This month"

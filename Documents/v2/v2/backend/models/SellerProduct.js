@@ -140,12 +140,23 @@ export class SellerProduct {
     const query = `UPDATE seller_products SET ${updates.join(', ')} WHERE id = ?`;
 
     return new Promise((resolve, reject) => {
+      const self = this;
       db.run(query, params, function(err) {
         if (err) {
           reject(err);
         } else {
-          Object.assign(this, updateData);
-          resolve(this);
+          // Update the instance with new data
+          Object.keys(updateData).forEach(key => {
+            if (key === 'customMargin') {
+              self.customMargin = updateData[key];
+            } else if (key === 'customPrice') {
+              self.customPrice = updateData[key];
+            } else if (key === 'isSelected') {
+              self.isSelected = updateData[key];
+            }
+          });
+          self.updatedAt = new Date().toISOString();
+          resolve(self);
         }
       });
     });

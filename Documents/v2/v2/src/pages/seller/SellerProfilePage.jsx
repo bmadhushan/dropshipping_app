@@ -22,7 +22,7 @@ const SellerProfilePage = () => {
       facebook: '',
       instagram: '',
       twitter: ''
-    },
+    }, 
     businessHours: {
       monday: { open: '09:00', close: '17:00', closed: false },
       tuesday: { open: '09:00', close: '17:00', closed: false },

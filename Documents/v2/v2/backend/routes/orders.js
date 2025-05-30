@@ -19,8 +19,11 @@ router.post('/', [
   body('items.*.unitPrice').isFloat({ min: 0 }).withMessage('Valid unit price is required for all items')
 ], async (req, res) => {
   try {
+    console.log('Received order creation request:', JSON.stringify(req.body, null, 2));
+    
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.log('Validation errors:', errors.array());
       return res.status(400).json({
         success: false,
         message: 'Validation failed',
@@ -299,30 +302,32 @@ router.get('/admin/all', authenticate, authorize('super_admin'), async (req, res
     const offset = (page - 1) * limit;
 
     const db = getDatabase();
-    let query = `
-      SELECT o.*, u.business_name as seller_business_name,
-             COUNT(oi.id) as item_count
+    
+    // First get orders
+    let orderQuery = `
+      SELECT o.*, u.business_name as seller_business_name, u.email as seller_email
       FROM orders o
       LEFT JOIN users u ON o.seller_id = u.id
-      LEFT JOIN order_items oi ON o.id = oi.order_id
       WHERE 1=1
     `;
     const params = [];
 
     if (status) {
-      query += ' AND o.status = ?';
+      orderQuery += ' AND o.status = ?';
       params.push(status);
     }
 
     if (sellerId) {
-      query += ' AND o.seller_id = ?';
+      orderQuery += ' AND o.seller_id = ?';
       params.push(parseInt(sellerId));
     }
 
-    query += ' GROUP BY o.id ORDER BY o.created_at DESC LIMIT ? OFFSET ?';
+    orderQuery += ' ORDER BY o.created_at DESC LIMIT ? OFFSET ?';
     params.push(parseInt(limit), offset);
 
-    db.all(query, params, (err, rows) => {
+    console.log('Executing order query:', orderQuery, 'with params:', params);
+
+    db.all(orderQuery, params, (err, orders) => {
       if (err) {
         console.error('Get all orders error:', err);
         return res.status(500).json({
@@ -331,14 +336,72 @@ router.get('/admin/all', authenticate, authorize('super_admin'), async (req, res
         });
       }
 
-      res.json({
-        success: true,
-        orders: rows,
-        pagination: {
-          page: parseInt(page),
-          limit: parseInt(limit),
-          hasMore: rows.length === parseInt(limit)
+      console.log(`Found ${orders.length} orders`);
+
+      if (orders.length === 0) {
+        return res.json({
+          success: true,
+          orders: [],
+          pagination: {
+            page: parseInt(page),
+            limit: parseInt(limit),
+            hasMore: false
+          }
+        });
+      }
+
+      // Get all order items in one query
+      const orderIds = orders.map(o => o.id);
+      const placeholders = orderIds.map(() => '?').join(',');
+      const itemsQuery = `SELECT * FROM order_items WHERE order_id IN (${placeholders}) ORDER BY order_id, id`;
+      
+      console.log('Executing items query:', itemsQuery, 'with order IDs:', orderIds);
+
+      db.all(itemsQuery, orderIds, (itemsErr, allItems) => {
+        if (itemsErr) {
+          console.error('Get order items error:', itemsErr);
+          return res.status(500).json({
+            success: false,
+            message: 'Failed to fetch order items'
+          });
         }
+
+        console.log(`Found ${allItems.length} total items for all orders`);
+
+        // Group items by order_id
+        const itemsByOrderId = {};
+        allItems.forEach(item => {
+          if (!itemsByOrderId[item.order_id]) {
+            itemsByOrderId[item.order_id] = [];
+          }
+          itemsByOrderId[item.order_id].push(item);
+        });
+
+        // Attach items to orders
+        const ordersWithItems = orders.map(order => {
+          const items = itemsByOrderId[order.id] || [];
+          console.log(`Order ${order.id} has ${items.length} items`);
+          return {
+            ...order,
+            items: items
+          };
+        });
+
+        console.log('Final orders with items:', ordersWithItems.map(o => ({ 
+          id: o.id, 
+          order_number: o.order_number,
+          itemCount: o.items.length 
+        })));
+
+        res.json({
+          success: true,
+          orders: ordersWithItems,
+          pagination: {
+            page: parseInt(page),
+            limit: parseInt(limit),
+            hasMore: orders.length === parseInt(limit)
+          }
+        });
       });
     });
   } catch (error) {
@@ -560,6 +623,257 @@ router.get('/admin/:id', authenticate, authorize('super_admin'), async (req, res
       success: false,
       message: 'Internal server error'
     });
+  }
+});
+
+// Generate and download invoice (admin only)
+router.get('/admin/:id/invoice', authenticate, authorize('super_admin'), async (req, res) => {
+  try {
+    const orderId = parseInt(req.params.id);
+    const db = getDatabase();
+
+    // Get order with seller and items
+    const orderQuery = `
+      SELECT o.*, u.business_name as seller_business_name, u.email as seller_email,
+             u.business_address, u.contact_person, u.phone as seller_phone
+      FROM orders o
+      LEFT JOIN users u ON o.seller_id = u.id
+      WHERE o.id = ?
+    `;
+    
+    db.get(orderQuery, [orderId], (err, order) => {
+      if (err) {
+        console.error('Get order for invoice error:', err);
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to fetch order'
+        });
+      }
+
+      if (!order) {
+        return res.status(404).json({
+          success: false,
+          message: 'Order not found'
+        });
+      }
+
+      // Get order items
+      const itemsQuery = 'SELECT * FROM order_items WHERE order_id = ?';
+      
+      db.all(itemsQuery, [orderId], async (itemsErr, items) => {
+        if (itemsErr) {
+          console.error('Get order items for invoice error:', itemsErr);
+          return res.status(500).json({
+            success: false,
+            message: 'Failed to fetch order items'
+          });
+        }
+
+        try {
+          // Generate invoice HTML
+          const invoiceHTML = generateInvoiceHTML(order, items);
+          
+          // For now, return HTML. In production, you'd convert to PDF
+          res.setHeader('Content-Type', 'text/html');
+          res.setHeader('Content-Disposition', `attachment; filename="invoice-${order.order_number}.html"`);
+          res.send(invoiceHTML);
+        } catch (invoiceErr) {
+          console.error('Invoice generation error:', invoiceErr);
+          res.status(500).json({
+            success: false,
+            message: 'Failed to generate invoice'
+          });
+        }
+      });
+    });
+  } catch (error) {
+    console.error('Invoice generation error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
+// Send payment link (admin only)
+router.post('/admin/:id/payment-link', authenticate, authorize('super_admin'), async (req, res) => {
+  try {
+    const orderId = parseInt(req.params.id);
+    const { sellerEmail, amount, currency = 'usd', description } = req.body;
+    
+    // In a real implementation, you would:
+    // 1. Create a Stripe payment link
+    // 2. Send email to seller with the payment link
+    // 3. Store the payment link in database
+    
+    // For now, simulate the process
+    const paymentLink = `https://buy.stripe.com/test_payment_${orderId}_${Date.now()}`;
+    
+    console.log(`Payment link generated for order ${orderId}:`, {
+      sellerEmail,
+      amount,
+      currency,
+      description,
+      paymentLink
+    });
+    
+    // Here you would integrate with:
+    // - Stripe API to create payment link
+    // - Email service to send notification
+    
+    res.json({
+      success: true,
+      message: 'Payment link sent successfully',
+      paymentLink: paymentLink
+    });
+  } catch (error) {
+    console.error('Payment link generation error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to generate payment link'
+    });
+  }
+});
+
+// Helper function to generate invoice HTML
+function generateInvoiceHTML(order, items) {
+  const currentDate = new Date().toLocaleDateString();
+  const orderDate = new Date(order.created_at).toLocaleDateString();
+  
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <title>Invoice - ${order.order_number}</title>
+        <style>
+            body { font-family: Arial, sans-serif; margin: 0; padding: 20px; color: #333; }
+            .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #354F52; padding-bottom: 20px; }
+            .company-name { font-size: 24px; font-weight: bold; color: #354F52; margin-bottom: 5px; }
+            .invoice-title { font-size: 18px; color: #666; }
+            .invoice-details { display: flex; justify-content: space-between; margin-bottom: 30px; }
+            .section { background: #f9f9f9; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+            .section-title { font-weight: bold; margin-bottom: 10px; color: #354F52; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+            th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+            th { background-color: #354F52; color: white; }
+            .total-row { background-color: #f0f8f0; font-weight: bold; }
+            .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; color: #666; }
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <div class="company-name">Dropshipping Platform</div>
+            <div class="invoice-title">INVOICE</div>
+        </div>
+        
+        <div class="invoice-details">
+            <div>
+                <strong>Invoice Number:</strong> ${order.order_number}<br>
+                <strong>Invoice Date:</strong> ${currentDate}<br>
+                <strong>Order Date:</strong> ${orderDate}
+            </div>
+            <div>
+                <strong>Status:</strong> ${order.status.toUpperCase()}<br>
+                <strong>Payment Status:</strong> ${order.payment_status || 'PENDING'}
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-title">Seller Information</div>
+            <strong>${order.seller_business_name || 'Business Name'}</strong><br>
+            Email: ${order.seller_email}<br>
+            ${order.business_address ? `Address: ${order.business_address}<br>` : ''}
+            ${order.seller_phone ? `Phone: ${order.seller_phone}<br>` : ''}
+        </div>
+        
+        <div class="section">
+            <div class="section-title">Customer Information</div>
+            <strong>${order.customer_name}</strong><br>
+            Email: ${order.customer_email}<br>
+            ${order.customer_phone ? `Phone: ${order.customer_phone}<br>` : ''}
+            <br><strong>Shipping Address:</strong><br>
+            ${order.shipping_address}
+        </div>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>Product</th>
+                    <th>SKU</th>
+                    <th>Quantity</th>
+                    <th>Unit Price</th>
+                    <th>Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${items.map(item => `
+                    <tr>
+                        <td>${item.product_name}</td>
+                        <td>${item.product_sku}</td>
+                        <td>${item.quantity}</td>
+                        <td>$${parseFloat(item.unit_price).toFixed(2)}</td>
+                        <td>$${parseFloat(item.total_price).toFixed(2)}</td>
+                    </tr>
+                `).join('')}
+                <tr class="total-row">
+                    <td colspan="4"><strong>Total Amount</strong></td>
+                    <td><strong>$${parseFloat(order.total_amount).toFixed(2)}</strong></td>
+                </tr>
+            </tbody>
+        </table>
+        
+        ${order.notes ? `
+        <div class="section">
+            <div class="section-title">Order Notes</div>
+            ${order.notes}
+        </div>
+        ` : ''}
+        
+        <div class="footer">
+            <p>Thank you for your business!</p>
+            <p>This invoice was generated on ${currentDate}</p>
+        </div>
+    </body>
+    </html>
+  `;
+}
+
+// Test endpoint to check order items
+router.get('/admin/test-items', authenticate, authorize('super_admin'), async (req, res) => {
+  try {
+    const db = getDatabase();
+    
+    // Get all orders
+    db.all('SELECT * FROM orders ORDER BY created_at DESC LIMIT 5', [], (err, orders) => {
+      if (err) {
+        return res.status(500).json({ error: err.message });
+      }
+      
+      // Get all order items
+      db.all('SELECT * FROM order_items ORDER BY order_id, id', [], (itemErr, items) => {
+        if (itemErr) {
+          return res.status(500).json({ error: itemErr.message });
+        }
+        
+        res.json({
+          success: true,
+          orders: orders,
+          items: items,
+          summary: {
+            totalOrders: orders.length,
+            totalItems: items.length,
+            orderItemMapping: items.reduce((acc, item) => {
+              if (!acc[item.order_id]) acc[item.order_id] = 0;
+              acc[item.order_id]++;
+              return acc;
+            }, {})
+          }
+        });
+      });
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 

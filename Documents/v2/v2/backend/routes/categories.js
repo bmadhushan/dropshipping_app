@@ -8,7 +8,7 @@ const router = express.Router();
 // Get all categories (public for sellers to view)
 router.get('/', optionalAuth, async (req, res) => {
   try {
-    const { includeInactive = false, search } = req.query;
+    const { includeInactive = false, search, hierarchical = false } = req.query;
     
     const filters = {};
     if (!includeInactive) {
@@ -18,11 +18,17 @@ router.get('/', optionalAuth, async (req, res) => {
       filters.search = search;
     }
 
-    const categories = await Category.findAll(filters);
+    let categories;
+    if (hierarchical === 'true') {
+      categories = await Category.findAllHierarchical(filters);
+    } else {
+      categories = await Category.findAll(filters);
+      categories = categories.map(cat => cat.toJSON());
+    }
     
     res.json({
       success: true,
-      categories: categories.map(cat => cat.toJSON())
+      categories: categories
     });
   } catch (error) {
     console.error('Get categories error:', error);
@@ -44,6 +50,68 @@ router.get('/active', async (req, res) => {
     });
   } catch (error) {
     console.error('Get active categories error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
+// Get root categories only
+router.get('/root', optionalAuth, async (req, res) => {
+  try {
+    const categories = await Category.getRootCategories();
+    
+    res.json({
+      success: true,
+      categories: categories.map(cat => cat.toJSON())
+    });
+  } catch (error) {
+    console.error('Get root categories error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
+// Get hierarchical structure
+router.get('/hierarchy', optionalAuth, async (req, res) => {
+  try {
+    const { includeInactive = false } = req.query;
+    
+    const filters = {};
+    if (!includeInactive) {
+      filters.isActive = true;
+    }
+
+    const categories = await Category.findAllHierarchical(filters);
+    
+    res.json({
+      success: true,
+      categories: categories
+    });
+  } catch (error) {
+    console.error('Get category hierarchy error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
+// Get children of a specific category
+router.get('/:id/children', optionalAuth, async (req, res) => {
+  try {
+    const parentId = parseInt(req.params.id);
+    const children = await Category.getChildren(parentId);
+    
+    res.json({
+      success: true,
+      categories: children.map(cat => cat.toJSON())
+    });
+  } catch (error) {
+    console.error('Get category children error:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error'
@@ -85,8 +153,10 @@ router.post('/', [
   body('description').optional().trim(),
   body('icon').optional().trim(),
   body('defaultMargin').optional().isFloat({ min: 0, max: 200 }).withMessage('Default margin must be between 0 and 200'),
+  body('shippingFee').optional().isFloat({ min: 0 }).withMessage('Shipping fee must be 0 or greater'),
   body('isActive').optional().isBoolean().withMessage('isActive must be a boolean'),
-  body('sortOrder').optional().isInt({ min: 0 }).withMessage('Sort order must be a non-negative integer')
+  body('sortOrder').optional().isInt({ min: 0 }).withMessage('Sort order must be a non-negative integer'),
+  body('parentId').optional().isInt({ min: 1 }).withMessage('Parent ID must be a positive integer')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -131,8 +201,10 @@ router.patch('/:id', [
   body('description').optional().trim(),
   body('icon').optional().trim(),
   body('defaultMargin').optional().isFloat({ min: 0, max: 200 }).withMessage('Default margin must be between 0 and 200'),
+  body('shippingFee').optional().isFloat({ min: 0 }).withMessage('Shipping fee must be 0 or greater'),
   body('isActive').optional().isBoolean().withMessage('isActive must be a boolean'),
-  body('sortOrder').optional().isInt({ min: 0 }).withMessage('Sort order must be a non-negative integer')
+  body('sortOrder').optional().isInt({ min: 0 }).withMessage('Sort order must be a non-negative integer'),
+  body('parentId').optional().isInt({ min: 1 }).withMessage('Parent ID must be a positive integer')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);

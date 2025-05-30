@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import '../../styles/theme.css';
 import apiService from '../../services/api';
+import { Users, Package, DollarSign, ShoppingCart, TrendingUp, TrendingDown, LayoutDashboard, Activity, Filter, BarChart3, Save, Edit3, Check, X } from 'lucide-react';
 
 const AdminDashboardPage = ({ setCurrentPage }) => {
   const [stats, setStats] = useState({
@@ -17,25 +18,118 @@ const AdminDashboardPage = ({ setCurrentPage }) => {
   const [recentSellers, setRecentSellers] = useState([]);
   const [recentActivity, setRecentActivity] = useState([]);
   const [topCategories, setTopCategories] = useState([]);
+  // Initialize with cached value or fallback
+  const getCachedConversionRate = () => {
+    try {
+      const cached = localStorage.getItem('conversionRate');
+      return cached ? parseFloat(cached) : 400;
+    } catch {
+      return 400;
+    }
+  };
+  
+  const [conversionRate, setConversionRate] = useState(getCachedConversionRate());
+  const [tempConversionRate, setTempConversionRate] = useState(getCachedConversionRate());
+  const [updatingRate, setUpdatingRate] = useState(false);
+  const [isEditingRate, setIsEditingRate] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     fetchDashboardData();
+    // Also try to load conversion rate independently
+    loadConversionRate();
   }, []);
+
+  const loadConversionRate = async () => {
+    try {
+      console.log('🔄 Loading conversion rate independently...');
+      
+      // Add timeout to prevent hanging
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout')), 5000)
+      );
+      
+      const rateData = await Promise.race([
+        apiService.getConversionRate(),
+        timeoutPromise
+      ]);
+      
+      console.log('💱 Independent conversion rate response:', rateData);
+      if (rateData.success && rateData.conversionRate) {
+        setConversionRate(rateData.conversionRate);
+        setTempConversionRate(rateData.conversionRate);
+        // Cache in localStorage for faster loading next time
+        localStorage.setItem('conversionRate', rateData.conversionRate.toString());
+        console.log('✅ Conversion rate loaded successfully:', rateData.conversionRate);
+      } else {
+        console.log('⚠️ API succeeded but no conversion rate data');
+        // Fallback to database default
+        setConversionRate(400); 
+        setTempConversionRate(400);
+      }
+    } catch (error) {
+      console.error('❌ Failed to load conversion rate:', error);
+      console.log('🔄 Using fallback value 400');
+      // Fallback to database default
+      setConversionRate(400);
+      setTempConversionRate(400);
+    }
+  };
 
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
       setError(null);
 
+      // Check if we're using mock authentication
+      const token = localStorage.getItem('auth_token');
+      if (token === 'mock-token-for-testing') {
+        // Use mock data when backend is not available
+        setTimeout(() => {
+          setStats({
+            totalSellers: 24,
+            activeSellers: 18,
+            totalProducts: 1247,
+            pendingProducts: 23,
+            totalRevenue: 45670,
+            monthlyRevenue: 12450,
+            totalOrders: 156,
+            pendingOrders: 8
+          });
+
+          setRecentSellers([
+            { id: 1, businessName: 'Tech Solutions Ltd', email: 'contact@techsolutions.com', status: 'pending', registrationDate: '2024-01-15' },
+            { id: 2, businessName: 'Fashion Forward', email: 'info@fashionforward.com', status: 'active', registrationDate: '2024-01-14' },
+            { id: 3, businessName: 'Home & Garden Co', email: 'sales@homegarden.com', status: 'pending', registrationDate: '2024-01-13' }
+          ]);
+
+          setRecentActivity([
+            { id: 1, type: 'seller_registered', description: 'New seller registration: Tech Solutions Ltd', timestamp: '2024-01-15T10:30:00Z' },
+            { id: 2, type: 'product_added', description: '25 new products added to catalog', timestamp: '2024-01-15T09:15:00Z' },
+            { id: 3, type: 'order_placed', description: 'New order #ORD-1001 placed', timestamp: '2024-01-15T08:45:00Z' }
+          ]);
+
+          setTopCategories([
+            { name: 'Electronics', productCount: 456, revenue: 18500 },
+            { name: 'Fashion', productCount: 312, revenue: 12300 },
+            { name: 'Home & Garden', productCount: 289, revenue: 9800 },
+            { name: 'Sports', productCount: 190, revenue: 5070 }
+          ]);
+
+          setLoading(false);
+        }, 1000); // Simulate API delay
+        return;
+      }
+
       // Fetch dashboard data with individual error handling
       const results = await Promise.allSettled([
         apiService.get('/admin/dashboard/stats'),
         apiService.get('/admin/dashboard/recent-sellers'),
         apiService.get('/admin/dashboard/recent-activity'),
-        apiService.get('/admin/dashboard/top-categories')
+        apiService.get('/admin/dashboard/top-categories'),
+        apiService.getConversionRate()
       ]);
 
       // Handle stats data
@@ -97,6 +191,32 @@ const AdminDashboardPage = ({ setCurrentPage }) => {
         setTopCategories(formattedCategories);
       }
 
+      // Handle conversion rate data
+      if (results[4].status === 'fulfilled') {
+        const rateData = results[4].value;
+        console.log('💱 Conversion rate API response:', rateData);
+        if (rateData.success && rateData.conversionRate) {
+          console.log('✅ Setting conversion rate to:', rateData.conversionRate);
+          setConversionRate(rateData.conversionRate);
+          setTempConversionRate(rateData.conversionRate);
+        } else {
+          console.log('⚠️ Conversion rate API succeeded but no data, keeping default');
+        }
+      } else {
+        console.log('❌ Conversion rate API failed:', results[4].reason);
+        // Try to fetch conversion rate separately
+        try {
+          const fallbackRate = await apiService.getConversionRate();
+          console.log('🔄 Fallback conversion rate:', fallbackRate);
+          if (fallbackRate.success && fallbackRate.conversionRate) {
+            setConversionRate(fallbackRate.conversionRate);
+            setTempConversionRate(fallbackRate.conversionRate);
+          }
+        } catch (error) {
+          console.log('❌ Fallback conversion rate also failed:', error);
+        }
+      }
+
       // Check if any critical API failed
       const failedCount = results.filter(r => r.status === 'rejected').length;
       if (failedCount === results.length) {
@@ -109,6 +229,46 @@ const AdminDashboardPage = ({ setCurrentPage }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleEditRate = () => {
+    setIsEditingRate(true);
+    setTempConversionRate(conversionRate);
+  };
+
+  const handleSaveRate = async () => {
+    try {
+      console.log('🔄 Starting conversion rate update...');
+      console.log('📊 Current temp rate:', tempConversionRate);
+      console.log('🎯 API token:', localStorage.getItem('auth_token'));
+      
+      setUpdatingRate(true);
+      const result = await apiService.updateConversionRate(tempConversionRate);
+      console.log('📤 API result:', result);
+      
+      if (result.success) {
+        setConversionRate(tempConversionRate);
+        setIsEditingRate(false);
+        // Cache in localStorage for faster loading
+        localStorage.setItem('conversionRate', tempConversionRate.toString());
+        console.log('✅ Conversion rate updated successfully');
+        alert('Conversion rate updated successfully!');
+      } else {
+        console.log('❌ Update failed:', result.message);
+        alert(`Failed to update: ${result.message}`);
+      }
+    } catch (error) {
+      console.error('❌ Failed to update conversion rate:', error);
+      alert(`Error: ${error.message}`);
+      setTempConversionRate(conversionRate); // Revert to previous value
+    } finally {
+      setUpdatingRate(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setTempConversionRate(conversionRate);
+    setIsEditingRate(false);
   };
 
   const formatTimeAgo = (date) => {
@@ -139,22 +299,22 @@ const AdminDashboardPage = ({ setCurrentPage }) => {
           {subtitle && <p className="stat-subtitle">{subtitle}</p>}
           {trend && (
             <div className={`flex items-center mt-2 text-sm`} style={{ color: trend > 0 ? 'var(--success)' : 'var(--error)' }}>
-              <span>{trend > 0 ? '↗️' : '↘️'}</span>
+              {trend > 0 ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
               <span style={{ marginLeft: '4px' }}>{Math.abs(trend)}% vs last month</span>
             </div>
           )}
         </div>
-        <div className="text-4xl" style={{ color: 'var(--primary-medium)' }}>{icon}</div>
+        <div style={{ color: 'var(--primary-medium)' }}>{icon}</div>
       </div>
     </div>
   );
 
   const getActivityIcon = (type) => {
     switch (type) {
-      case 'seller': return '👥';
-      case 'product': return '📦';
-      case 'pricing': return '💰';
-      default: return '📝';
+      case 'seller': return <Users size={20} />;
+      case 'product': return <Package size={20} />;
+      case 'pricing': return <DollarSign size={20} />;
+      default: return <Activity size={20} />;
     }
   };
 
@@ -204,28 +364,28 @@ const AdminDashboardPage = ({ setCurrentPage }) => {
             title="Total Sellers"
             value={stats.totalSellers}
             subtitle={`${stats.activeSellers} active`}
-            icon="👥"
+            icon={<Users size={24} />}
             trend={18}
           />
           <StatCard
             title="Total Products"
             value={stats.totalProducts}
             subtitle={`${stats.pendingProducts} pending approval`}
-            icon="📦"
+            icon={<Package size={24} />}
             trend={12}
           />
           <StatCard
             title="Platform Revenue"
-            value={`$${stats.monthlyRevenue.toFixed(2)}`}
+            value={`£${stats.monthlyRevenue.toFixed(2)}`}
             subtitle="This month"
-            icon="💰"
+            icon={<DollarSign size={24} />}
             trend={24}
           />
           <StatCard
             title="Total Orders"
             value={stats.totalOrders}
             subtitle={`${stats.pendingOrders} pending`}
-            icon="🛒"
+            icon={<ShoppingCart size={24} />}
             trend={15}
           />
         </div>
@@ -278,7 +438,7 @@ const AdminDashboardPage = ({ setCurrentPage }) => {
                       <td className="font-medium">{seller.name}</td>
                       <td>{seller.contact}</td>
                       <td>{seller.products}</td>
-                      <td className="font-semibold">${seller.revenue.toFixed(2)}</td>
+                      <td className="font-semibold">£{seller.revenue.toFixed(2)}</td>
                       <td>
                         <span className={`badge ${
                           seller.status === 'pending' ? 'badge-warning' :
@@ -321,6 +481,156 @@ const AdminDashboardPage = ({ setCurrentPage }) => {
         </div>
       </div>
 
+        {/* LKR Conversion Rate Section */}
+        <div style={{ 
+          padding: '0 var(--space-6)',
+          marginTop: 'var(--space-6)'
+        }}>
+          <div className="card">
+            <div className="card-header">
+              <h3 className="card-title">LKR Conversion Rate</h3>
+            </div>
+            <div className="card-body">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ 
+                    display: 'block', 
+                    marginBottom: '0.5rem', 
+                    fontSize: '0.875rem', 
+                    fontWeight: '500',
+                    color: 'var(--text-secondary)' 
+                  }}>
+                    1 GBP = LKR
+                  </label>
+                  <div style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: 'var(--space-3)',
+                    padding: '0.75rem',
+                    border: '2px solid var(--border)',
+                    borderRadius: 'var(--radius)',
+                    backgroundColor: 'var(--background)',
+                    transition: 'border-color 0.2s'
+                  }}>
+                    {isEditingRate ? (
+                      <>
+                        <input
+                          type="number"
+                          value={tempConversionRate || ''}
+                          onChange={(e) => setTempConversionRate(parseFloat(e.target.value) || 0)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleSaveRate();
+                            } else if (e.key === 'Escape') {
+                              handleCancelEdit();
+                            }
+                          }}
+                          disabled={updatingRate}
+                          min="1"
+                          max="1000"
+                          step="0.01"
+                          style={{
+                            flex: 1,
+                            border: 'none',
+                            outline: 'none',
+                            fontSize: '1rem',
+                            color: 'var(--text-primary)',
+                            backgroundColor: 'transparent'
+                          }}
+                          autoFocus
+                        />
+                        <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                          <button
+                            onClick={handleSaveRate}
+                            disabled={updatingRate}
+                            style={{
+                              padding: '0.25rem',
+                              border: 'none',
+                              borderRadius: 'var(--radius-sm)',
+                              backgroundColor: 'var(--success)',
+                              color: 'white',
+                              cursor: updatingRate ? 'not-allowed' : 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              opacity: updatingRate ? 0.6 : 1
+                            }}
+                            title="Save"
+                          >
+                            {updatingRate ? (
+                              <div className="spinner" style={{
+                                width: '14px',
+                                height: '14px',
+                                border: '2px solid white',
+                                borderTopColor: 'transparent',
+                                borderRadius: '50%'
+                              }} />
+                            ) : (
+                              <Check size={14} />
+                            )}
+                          </button>
+                          <button
+                            onClick={handleCancelEdit}
+                            disabled={updatingRate}
+                            style={{
+                              padding: '0.25rem',
+                              border: 'none',
+                              borderRadius: 'var(--radius-sm)',
+                              backgroundColor: 'var(--error)',
+                              color: 'white',
+                              cursor: updatingRate ? 'not-allowed' : 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              opacity: updatingRate ? 0.6 : 1
+                            }}
+                            title="Cancel"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <span style={{ 
+                          flex: 1, 
+                          fontSize: '1rem', 
+                          fontWeight: '600',
+                          color: 'var(--text-primary)' 
+                        }}>
+                          {conversionRate.toFixed(2)}
+                        </span>
+                        <button
+                          onClick={handleEditRate}
+                          style={{
+                            padding: '0.25rem',
+                            border: 'none',
+                            borderRadius: 'var(--radius-sm)',
+                            backgroundColor: 'var(--primary-medium)',
+                            color: 'white',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center'
+                          }}
+                          title="Edit conversion rate"
+                        >
+                          <Edit3 size={14} />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <p style={{ 
+                marginTop: '0.75rem', 
+                fontSize: '0.875rem', 
+                color: 'var(--text-secondary)' 
+              }}>
+                This conversion rate is used to calculate admin prices: ((base price × margin) + shipping fee) × conversion rate
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* Bottom Section */}
         <div style={{ 
           display: 'grid', 
@@ -360,7 +670,7 @@ const AdminDashboardPage = ({ setCurrentPage }) => {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="font-semibold text-sm" style={{ color: 'var(--primary-dark)' }}>${category.revenue.toFixed(2)}</p>
+                    <p className="font-semibold text-sm" style={{ color: 'var(--primary-dark)' }}>£{category.revenue.toFixed(2)}</p>
                   </div>
                 </div>
               ))}
@@ -385,7 +695,7 @@ const AdminDashboardPage = ({ setCurrentPage }) => {
                 className="quick-action"
                 style={{ cursor: 'pointer' }}
               >
-                <div className="quick-action-icon">👥</div>
+                <div className="quick-action-icon"><Users size={24} /></div>
                 <span className="quick-action-label">Seller Management</span>
               </button>
               <button 
@@ -398,7 +708,7 @@ const AdminDashboardPage = ({ setCurrentPage }) => {
                 className="quick-action"
                 style={{ cursor: 'pointer' }}
               >
-                <div className="quick-action-icon">📦</div>
+                <div className="quick-action-icon"><Package size={24} /></div>
                 <span className="quick-action-label">Product Management</span>
               </button>
               <button 
@@ -411,7 +721,7 @@ const AdminDashboardPage = ({ setCurrentPage }) => {
                 className="quick-action"
                 style={{ cursor: 'pointer' }}
               >
-                <div className="quick-action-icon">💰</div>
+                <div className="quick-action-icon"><DollarSign size={24} /></div>
                 <span className="quick-action-label">Pricing Settings</span>
               </button>
               <button 
@@ -424,7 +734,7 @@ const AdminDashboardPage = ({ setCurrentPage }) => {
                 className="quick-action"
                 style={{ cursor: 'pointer' }}
               >
-                <div className="quick-action-icon">🛒</div>
+                <div className="quick-action-icon"><ShoppingCart size={24} /></div>
                 <span className="quick-action-label">Order Review</span>
               </button>
             </div>

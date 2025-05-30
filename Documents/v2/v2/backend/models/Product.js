@@ -8,6 +8,7 @@ export class Product {
     this.description = productData.description;
     this.category = productData.category;
     this.brand = productData.brand;
+    this.basePrice = parseFloat(productData.base_price || productData.basePrice || 0);
     this.adminPrice = parseFloat(productData.admin_price || productData.adminPrice || 0);
     this.stock = parseInt(productData.stock || 0);
     this.weight = parseFloat(productData.weight || 0);
@@ -23,9 +24,9 @@ export class Product {
     
     const query = `
       INSERT INTO products (
-        sku, name, description, category, brand, admin_price, 
+        sku, name, description, category, brand, base_price, admin_price, 
         stock, weight, dimensions, image, published
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const params = [
@@ -34,6 +35,7 @@ export class Product {
       productData.description,
       productData.category,
       productData.brand,
+      productData.basePrice || productData.base_price || productData.adminPrice || productData.admin_price || 0,
       productData.adminPrice || productData.admin_price,
       productData.stock || 0,
       productData.weight || 0,

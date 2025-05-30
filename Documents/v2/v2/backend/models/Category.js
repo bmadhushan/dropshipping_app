@@ -7,18 +7,24 @@ export class Category {
     this.description = categoryData.description;
     this.icon = categoryData.icon;
     this.defaultMargin = parseFloat(categoryData.default_margin || categoryData.defaultMargin || 20);
+    this.shippingFee = parseFloat(categoryData.shipping_fee || categoryData.shippingFee || 0);
     this.isActive = Boolean(categoryData.is_active !== undefined ? categoryData.is_active : categoryData.isActive !== undefined ? categoryData.isActive : true);
     this.sortOrder = parseInt(categoryData.sort_order || categoryData.sortOrder || 0);
+    this.parentId = categoryData.parent_id || categoryData.parentId || null;
     this.createdAt = categoryData.created_at || categoryData.createdAt;
     this.updatedAt = categoryData.updated_at || categoryData.updatedAt;
+    
+    // For hierarchical data
+    this.children = categoryData.children || [];
+    this.level = categoryData.level || 0;
   }
 
   static async create(categoryData) {
     const db = getDatabase();
     
     const query = `
-      INSERT INTO categories (name, description, icon, default_margin, is_active, sort_order)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO categories (name, description, icon, default_margin, shipping_fee, is_active, sort_order, parent_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const params = [
@@ -26,8 +32,10 @@ export class Category {
       categoryData.description || null,
       categoryData.icon || null,
       categoryData.defaultMargin || 20,
+      categoryData.shippingFee || 0,
       categoryData.isActive !== undefined ? categoryData.isActive : true,
-      categoryData.sortOrder || 0
+      categoryData.sortOrder || 0,
+      categoryData.parentId || null
     ];
 
     return new Promise((resolve, reject) => {
@@ -118,11 +126,17 @@ export class Category {
         if (key === 'defaultMargin') {
           updates.push('default_margin = ?');
           params.push(updateData[key]);
+        } else if (key === 'shippingFee') {
+          updates.push('shipping_fee = ?');
+          params.push(updateData[key]);
         } else if (key === 'isActive') {
           updates.push('is_active = ?');
           params.push(updateData[key]);
         } else if (key === 'sortOrder') {
           updates.push('sort_order = ?');
+          params.push(updateData[key]);
+        } else if (key === 'parentId') {
+          updates.push('parent_id = ?');
           params.push(updateData[key]);
         } else {
           updates.push(`${key} = ?`);
@@ -140,13 +154,15 @@ export class Category {
 
     const query = `UPDATE categories SET ${updates.join(', ')} WHERE id = ?`;
 
+    const categoryInstance = this;
+
     return new Promise((resolve, reject) => {
       db.run(query, params, function(err) {
         if (err) {
           reject(err);
         } else {
-          Object.assign(this, updateData);
-          resolve(this);
+          Object.assign(categoryInstance, updateData);
+          resolve(categoryInstance);
         }
       });
     });
@@ -200,10 +216,14 @@ export class Category {
       description: this.description,
       icon: this.icon,
       defaultMargin: this.defaultMargin,
+      shippingFee: this.shippingFee,
       isActive: this.isActive,
       sortOrder: this.sortOrder,
+      parentId: this.parentId,
       createdAt: this.createdAt,
-      updatedAt: this.updatedAt
+      updatedAt: this.updatedAt,
+      children: this.children,
+      level: this.level
     };
   }
 
@@ -253,5 +273,94 @@ export class Category {
         }
       });
     });
+  }
+
+  static async findAllHierarchical(filters = {}) {
+    const categories = await Category.findAll(filters);
+    return Category.buildHierarchy(categories);
+  }
+
+  static buildHierarchy(categories) {
+    const categoryMap = new Map();
+    const rootCategories = [];
+
+    // First pass: create map and identify root categories
+    categories.forEach(category => {
+      categoryMap.set(category.id, { ...category, children: [] });
+      if (!category.parentId) {
+        rootCategories.push(categoryMap.get(category.id));
+      }
+    });
+
+    // Second pass: build parent-child relationships
+    categories.forEach(category => {
+      if (category.parentId && categoryMap.has(category.parentId)) {
+        const parent = categoryMap.get(category.parentId);
+        const child = categoryMap.get(category.id);
+        child.level = (parent.level || 0) + 1;
+        parent.children.push(child);
+      }
+    });
+
+    return rootCategories;
+  }
+
+  static async getChildren(parentId) {
+    const db = getDatabase();
+    const query = 'SELECT * FROM categories WHERE parent_id = ? ORDER BY sort_order ASC, name ASC';
+
+    return new Promise((resolve, reject) => {
+      db.all(query, [parentId], (err, rows) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(rows.map(row => new Category(row)));
+        }
+      });
+    });
+  }
+
+  static async getDescendants(parentId) {
+    const descendants = [];
+    const children = await Category.getChildren(parentId);
+    
+    for (const child of children) {
+      descendants.push(child);
+      const childDescendants = await Category.getDescendants(child.id);
+      descendants.push(...childDescendants);
+    }
+    
+    return descendants;
+  }
+
+  static async getRootCategories() {
+    const db = getDatabase();
+    const query = 'SELECT * FROM categories WHERE parent_id IS NULL ORDER BY sort_order ASC, name ASC';
+
+    return new Promise((resolve, reject) => {
+      db.all(query, [], (err, rows) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(rows.map(row => new Category(row)));
+        }
+      });
+    });
+  }
+
+  async getPath() {
+    const path = [this];
+    let current = this;
+    
+    while (current.parentId) {
+      current = await Category.findById(current.parentId);
+      if (current) {
+        path.unshift(current);
+      } else {
+        break;
+      }
+    }
+    
+    return path;
   }
 }

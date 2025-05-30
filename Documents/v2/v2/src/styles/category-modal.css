@@ -1,0 +1,172 @@
+/* Category Modal Styles - Matching Login Modal Design */
+.category-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--white);
+  border-radius: 20px;
+  padding: 2.5rem;
+  box-shadow: 0 25px 50px rgba(53, 75, 74, 0.2);
+  width: 90%;
+  max-width: 520px;
+  max-height: 90vh;
+  overflow-y: auto;
+  z-index: 10000;
+  animation: slideIn 0.3s ease;
+}
+
+/* Modal Header */
+.category-modal-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.category-modal-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--primary-dark);
+  margin: 0 0 0.5rem 0;
+}
+
+.category-modal-subtitle {
+  font-size: 0.95rem;
+  color: var(--secondary);
+  margin: 0;
+}
+
+/* Form Styles */
+.category-modal-form {
+  margin-bottom: 0;
+}
+
+.category-modal-form .form-group {
+  margin-bottom: 1.25rem;
+}
+
+.category-modal-form .form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.category-modal-form .form-row .form-group {
+  margin-bottom: 0;
+}
+
+/* Checkbox Styles */
+.form-checkbox {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  padding: 0.75rem 0;
+}
+
+.form-checkbox input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  margin-right: 0.75rem;
+  cursor: pointer;
+  accent-color: var(--primary-dark);
+}
+
+.form-checkbox .checkbox-label {
+  font-weight: 600;
+  color: var(--primary-dark);
+  font-size: 0.875rem;
+}
+
+/* Form Actions */
+.form-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(157, 186, 145, 0.2);
+}
+
+.btn-secondary {
+  flex: 1;
+  background: transparent;
+  color: var(--primary-dark);
+  border: 2px solid rgba(157, 186, 145, 0.3);
+  padding: 0.875rem;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-secondary:hover {
+  background: rgba(157, 186, 145, 0.1);
+  border-color: var(--primary-light);
+}
+
+.btn-primary {
+  flex: 1;
+  background: var(--button-primary);
+  color: var(--white);
+  border: none;
+  padding: 0.875rem;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(53, 79, 82, 0.25);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #2a3e41;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(53, 79, 82, 0.35);
+}
+
+.btn-primary:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+/* Select Dropdown */
+.category-modal-form select.form-input {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23354B4A' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 1rem center;
+  padding-right: 2.5rem;
+}
+
+/* Success Message */
+.success-message {
+  background: #d1fae5;
+  color: #065f46;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+  border: 1px solid #a7f3d0;
+}
+
+/* Responsive Design */
+@media (max-width: 480px) {
+  .category-modal {
+    padding: 2rem;
+    width: 95%;
+  }
+
+  .category-modal-form .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .form-actions {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .btn-secondary,
+  .btn-primary {
+    width: 100%;
+  }
+}

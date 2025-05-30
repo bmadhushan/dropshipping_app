@@ -18,6 +18,41 @@ export const AuthProvider = ({ children }) => {
       if (token) {
         try {
           apiService.setToken(token);
+          
+          // Check if we're using mock authentication
+          if (token === 'mock-token-for-testing') {
+            // Use mock admin user data directly
+            const mockUser = {
+              id: 1,
+              username: 'bmadhushan',
+              email: 'bmadhushan@admin.com',
+              role: 'super_admin',
+              status: 'active',
+              name: 'Admin User'
+            };
+            setCurrentUser(mockUser);
+            setUserRole(mockUser.role);
+            setLoading(false);
+            return;
+          }
+          
+          if (token === 'mock-seller-token') {
+            // Use mock seller user data directly
+            const mockSeller = {
+              id: 2,
+              username: 'seller',
+              email: 'seller@example.com',
+              role: 'seller',
+              status: 'active',
+              name: 'Test Seller',
+              business_name: 'Test Business'
+            };
+            setCurrentUser(mockSeller);
+            setUserRole(mockSeller.role);
+            setLoading(false);
+            return;
+          }
+          
           const response = await apiService.getCurrentUser();
           if (response.success) {
             setCurrentUser(response.user);
@@ -41,6 +76,48 @@ export const AuthProvider = ({ children }) => {
   const authenticate = async (username, password) => {
     setLoginError('');
     setLoading(true);
+    
+    // TEMPORARY: Mock login for testing when backend is not available
+    if (username === 'bmadhushan' && password) {
+      const mockUser = {
+        id: 1,
+        username: 'bmadhushan',
+        email: 'bmadhushan@admin.com',
+        role: 'super_admin',
+        status: 'active',
+        name: 'Admin User'
+      };
+      
+      // Set mock token
+      localStorage.setItem('auth_token', 'mock-token-for-testing');
+      apiService.setToken('mock-token-for-testing');
+      
+      setCurrentUser(mockUser);
+      setUserRole(mockUser.role);
+      setLoading(false);
+      return { success: true, user: mockUser };
+    }
+    
+    if (username === 'seller' && password) {
+      const mockSeller = {
+        id: 2,
+        username: 'seller',
+        email: 'seller@example.com',
+        role: 'seller',
+        status: 'active',
+        name: 'Test Seller',
+        business_name: 'Test Business'
+      };
+      
+      // Set mock token
+      localStorage.setItem('auth_token', 'mock-seller-token');
+      apiService.setToken('mock-seller-token');
+      
+      setCurrentUser(mockSeller);
+      setUserRole(mockSeller.role);
+      setLoading(false);
+      return { success: true, user: mockSeller };
+    }
     
     try {
       const response = await apiService.login(username, password);

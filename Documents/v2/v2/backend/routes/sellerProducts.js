@@ -114,26 +114,39 @@ router.patch('/pricing/:productId', [
 
     const productId = parseInt(req.params.productId);
     const { customMargin, customPrice } = req.body;
-
-    // Find seller product
-    const sellerProduct = await SellerProduct.findBySellerAndProduct(req.user.id, productId);
-    if (!sellerProduct) {
-      return res.status(404).json({
-        success: false,
-        message: 'Product not found in your store'
-      });
-    }
-
-    // Update pricing
-    const updatedSellerProduct = await sellerProduct.update({
+    
+    console.log('Pricing update request:', {
+      sellerId: req.user.id,
+      productId,
       customMargin,
       customPrice
     });
 
+    // Find seller product
+    let sellerProduct = await SellerProduct.findBySellerAndProduct(req.user.id, productId);
+    
+    if (!sellerProduct) {
+      // Create a new seller product entry with the pricing
+      console.log('Creating new seller product for pricing update');
+      sellerProduct = await SellerProduct.create({
+        sellerId: req.user.id,
+        productId,
+        customMargin,
+        customPrice,
+        isSelected: false // Not selected by default when only updating pricing
+      });
+    } else {
+      // Update existing seller product
+      sellerProduct = await sellerProduct.update({
+        customMargin,
+        customPrice
+      });
+    }
+
     res.json({
       success: true,
       message: 'Product pricing updated successfully',
-      sellerProduct: updatedSellerProduct
+      sellerProduct: sellerProduct
     });
   } catch (error) {
     console.error('Update pricing error:', error);
@@ -311,6 +324,28 @@ router.get('/catalog', authenticate, authorize('seller'), async (req, res) => {
 
     const allProducts = await Product.findAll(filters);
     
+    // Get categories with pricing info for calculating admin final prices
+    const { Category } = await import('../models/Category.js');
+    const categories = await Category.findAll();
+    const categoryMap = new Map();
+    categories.forEach(cat => {
+      categoryMap.set(cat.name, cat);
+    });
+    
+    // Function to calculate admin final price (this becomes seller base price)
+    const calculateAdminFinalPrice = (adminPrice, categoryName) => {
+      const category = categoryMap.get(categoryName);
+      if (!category) {
+        console.log(`⚠️ Category not found: ${categoryName}, using fallback`);
+        return adminPrice * 1.5; // Fallback to 50% markup
+      }
+      const margin = category.defaultMargin || 20;
+      const shippingFee = category.shippingFee || 0;
+      const finalPrice = (adminPrice * (1 + margin / 100)) + shippingFee;
+      console.log(`💰 Price calc for ${categoryName}: ${adminPrice} → ${finalPrice} (margin: ${margin}%, shipping: ${shippingFee})`);
+      return finalPrice;
+    };
+    
     // Get seller's product customizations
     const sellerProducts = await SellerProduct.findBySeller(req.user.id);
     const sellerProductMap = new Map();
@@ -321,8 +356,12 @@ router.get('/catalog', authenticate, authorize('seller'), async (req, res) => {
     // Merge data
     let products = allProducts.map(product => {
       const sellerProduct = sellerProductMap.get(product.id);
+      const adminFinalPrice = calculateAdminFinalPrice(product.adminPrice, product.category);
+      
       return {
         ...product,
+        adminPrice: adminFinalPrice, // Admin's final price becomes seller's base price
+        originalAdminPrice: product.adminPrice, // Keep original for reference
         customMargin: sellerProduct?.customMargin || null,
         customPrice: sellerProduct?.customPrice || null,
         isSelected: sellerProduct?.isSelected || false
