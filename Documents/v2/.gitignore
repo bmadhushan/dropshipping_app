@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+v2/node_modules/
+v2/backend/node_modules/
+
+# Environment variables
+.env
+v2/backend/.env
+
+# Logs
+*.log
+logs/
+v2/backend/*.log
+v2/*.log
+
+# Database files
+*.db-journal
+v2/backend/database/*.db-journal
+
+# Build outputs
+dist/
+build/
+v2/dist/
+v2/build/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporary files
+*.tmp
+*.temp
